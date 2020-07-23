@@ -128,3 +128,10 @@ export function sentenceCase(s) {
 
 // --------------------------------------------------------------------------- 
 
+export const RenderMode = Object.freeze({
+  Pathify: 'Pathify',
+  Solidify: 'Solidify',
+});
+
+// --------------------------------------------------------------------------- 
+

@@ -2086,8 +2086,10 @@ export class ExpressionMoveto extends ExpressionFunction {
     const x = env.variables.x.value;
     const y = env.variables.y.value;
     const z = env.variables.z.value;
+
     env.root.visit({
       position: new Vector3(x, y, z),
+      radius: 0.5,
     });
   }
 }
@@ -2099,12 +2101,7 @@ export class ExpressionDowel extends ExpressionFunction {
     const polyline = env.root.seal();
     const direction = polyline.vertices[1].position.subtract(polyline.vertices[0].position).normalize();
 
-    const normal = direction.perpendicular().scalarMultiply(0.1);
-
-    // for n
-    //   rotate normal
-    //   add it to endpoint
-    //   create vertex
+    const normal = direction.perpendicular();
 
     const positions = [];
     const faces = [];
@@ -2112,13 +2109,13 @@ export class ExpressionDowel extends ExpressionFunction {
 
     const rotater = Matrix4.rotate(direction, 360 / sideCount);
 
-    let offset = normal.toVector4(0);
+    let offset = normal.scalarMultiply(polyline.vertices[0].radius).toVector4(0);
     for (let i = 0; i < sideCount; ++i) {
       positions.push(polyline.vertices[0].position.add(offset));
       offset = rotater.multiplyVector(offset);
     }
 
-    offset = normal.toVector4(0);
+    offset = normal.scalarMultiply(polyline.vertices[1].radius).toVector4(0);
     for (let i = 0; i < sideCount; ++i) {
       positions.push(polyline.vertices[1].position.add(offset));
       offset = rotater.multiplyVector(offset);

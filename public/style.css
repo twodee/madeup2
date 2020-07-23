@@ -167,12 +167,12 @@ html.grabbing {
 }
 
 .height-resizer {
-  background-image: url('horizontal_bars.png');
+  background-image: url('images/horizontal_bars.png');
   cursor: row-resize;
 }
 
 .width-resizer {
-  background-image: url('vertical_bars.png');
+  background-image: url('images/vertical_bars.png');
   cursor: col-resize;
 }
 
@@ -210,4 +210,22 @@ html.grabbing {
   stroke: white;
   stroke-dasharray: none;
   vector-effect: non-scaling-stroke;
+}
+
+.tool-icon {
+  width: 60px;
+  transition-property: transform; 
+  transition-duration: 200ms;
+  transition-timing-function: ease-in-out;
+  margin-left: 5px;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.tool-icon:hover {
+  transform: scale(1.2);
+}
+
+.tool-icon:active {
+  transform: rotate(20deg) scale(0.9);
 }

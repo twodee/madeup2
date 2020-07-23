@@ -4,6 +4,7 @@ import './mode-madeup.js';
 
 import {
   MessagedException,
+  RenderMode,
 } from './common.js';
 
 // import {
@@ -34,13 +35,13 @@ let editor;
 let Range;
 let left;
 let messagerContainer;
-let evaluateButton;
-let exportButton;
+let pathifyButton;
+let solidifyButton;
 let fitButton;
-let stopButton;
 let saveButton;
+// let stopButton;
 let interpreterWorker;
-let evaluateSpinner;
+// let evaluateSpinner;
 let canvas;
 
 let polylines;
@@ -51,6 +52,7 @@ let pathObjects;
 
 let nodeProgram;
 let pathProgram;
+let solidMeshProgram;
 
 let projection;
 let modelview;
@@ -60,6 +62,7 @@ let aspectRatio;
 
 let scene;
 let isSaved = true;
+let isMouseDown;
 
 // --------------------------------------------------------------------------- 
 
@@ -104,8 +107,8 @@ function stopInterpreting() {
     interpreterWorker.terminate();
     interpreterWorker = undefined;
   }
-  stopButton.classList.add('hidden');
-  stopSpinning(evaluateSpinner, evaluateButton);
+  // stopButton.classList.add('hidden');
+  // stopSpinning(evaluateSpinner, pathifyButton);
 }
 
 // --------------------------------------------------------------------------- 
@@ -116,8 +119,35 @@ function postInterpret(pod) {
     object.vertexAttributes.destroy();
   }
 
-  polylines = pod.polylines;
-  pathObjects = pod.polylines.filter(polyline => polyline.length > 0).map(polyline => generatePathObject(polyline));
+  for (let meshObject of meshObjects) {
+    meshObject.vertexAttributes.destroy();
+    meshObject.vertexArray.destroy();
+  }
+
+  pathObjects = [];
+  meshObjects = [];
+
+  if (pod.renderMode === RenderMode.Pathify) {
+    polylines = pod.polylines;
+    pathObjects = pod.polylines.filter(polyline => polyline.length > 0).map(polyline => generatePathObject(polyline));
+  } else if (pod.renderMode === RenderMode.Solidify) {
+    const mesh = pod.meshes[0];
+    mesh.separateFaces();
+
+    const vertexAttributes = new VertexAttributes();
+    vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.getFlatPositions());
+    vertexAttributes.addAttribute('vnormal', mesh.vertexCount, 4, mesh.getFlatNormals());
+    vertexAttributes.addIndices(mesh.getFlatFaces());
+
+    const vertexArray = new VertexArray(solidMeshProgram, vertexAttributes);
+
+    meshObjects = [
+      {
+        vertexAttributes,
+        vertexArray,
+      },
+    ];
+  }
 
   render();
 
@@ -204,11 +234,11 @@ function postInterpret(pod) {
 
 // --------------------------------------------------------------------------- 
 
-function startInterpreting() {
+function startInterpreting(renderMode) {
   stopInterpreting();
 
-  startSpinning(evaluateSpinner, evaluateButton);
-  stopButton.classList.remove('hidden');
+  // startSpinning(evaluateSpinner, pathifyButton);
+  // stopButton.classList.remove('hidden');
 
   Messager.clear();
 
@@ -229,26 +259,12 @@ function startInterpreting() {
     interpreterWorker.postMessage({
       command: 'interpret',
       source: editor.getValue(),
+      renderMode,
     });
   } else {
-    const scene = interpret(editor.getValue(), Messager.log);
+    const scene = interpret(editor.getValue(), Messager.log, renderMode);
     stopInterpreting();
     if (scene) {
-      const mesh = scene.meshes;
-
-      const vertexAttributes = new VertexAttributes();
-      vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.getFlatPositions());
-      vertexAttributes.addIndices(mesh.getFlatFaces());
-
-      const vertexArray = new VertexArray(nodeProgram, vertexAttributes);
-
-      meshObjects = [
-        {
-          vertexAttributes,
-          vertexArray,
-        },
-      ];
-
       postInterpret(scene.toPod());
     }
   }
@@ -288,6 +304,7 @@ function initialize() {
   pathObjects = [];
   polylines = [];
   meshObjects = [];
+  isMouseDown = false;
 
   initializeDOM();
   initializeGL();
@@ -309,12 +326,12 @@ function initializeDOM() {
 
   left = document.getElementById('left');
   messagerContainer = document.getElementById('messager-container');
-  evaluateButton = document.getElementById('evaluate-button');
-  exportButton = document.getElementById('export-button');
+  pathifyButton = document.getElementById('pathify-button');
+  solidifyButton = document.getElementById('solidify-button');
   fitButton = document.getElementById('fit-button');
-  stopButton = document.getElementById('stop-button');
+  // stopButton = document.getElementById('stop-button');
   saveButton = document.getElementById('save-button');
-  evaluateSpinner = document.getElementById('evaluate-spinner');
+  // evaluateSpinner = document.getElementById('evaluate-spinner');
   new Messager(document.getElementById('messager'), document, highlight);
 
   // if (localStorage.getItem('src') !== null) {
@@ -339,12 +356,16 @@ function initializeDOM() {
     if (scene) scene.fit();
   });
 
-  stopButton.addEventListener('click', e => {
-    stopInterpreting();
+  // stopButton.addEventListener('click', e => {
+    // stopInterpreting();
+  // });
+
+  pathifyButton.addEventListener('click', () => {
+    startInterpreting(RenderMode.Pathify);
   });
 
-  evaluateButton.addEventListener('click', () => {
-    startInterpreting();
+  solidifyButton.addEventListener('click', () => {
+    startInterpreting(RenderMode.Solidify);
   });
 
   if (source0) {
@@ -447,7 +468,15 @@ function initializeGL() {
 
   initializeNodeProgram();
   initializePathProgram();
+  initializeSolidMeshProgram();
+  initializePathifyNodeObject();
 
+  reset();
+}
+
+// ---------------------------------------------------------------------------
+
+function initializePathifyNodeObject() {
   // Make sphere for path nodes.
   const mesh = Prefab.sphere(0.03, new Vector3(0, 0, 0), 20, 10); 
 
@@ -461,9 +490,6 @@ function initializeGL() {
     vertexAttributes,
     vertexArray,
   };
-  console.log("nodeObject:", nodeObject);
-
-  reset();
 }
 
 // --------------------------------------------------------------------------- 
@@ -616,6 +642,56 @@ void main() {
 
 // --------------------------------------------------------------------------- 
 
+function initializeSolidMeshProgram() {
+  if (solidMeshProgram) {
+    solidMeshProgram.destroy();
+  }
+
+  const vertexSource = `#version 300 es
+uniform mat4 projection;
+uniform mat4 modelview;
+
+in vec3 vposition;
+in vec3 vnormal;
+
+out vec3 positionEye;
+out vec3 normalEye;
+
+void main() {
+  vec4 positionEye4 = modelview * vec4(vposition, 1.0);
+  gl_Position = projection * positionEye4;
+
+  normalEye = normalize((modelview * vec4(vnormal, 0.0)).xyz);
+  positionEye = positionEye4.xyz;
+}
+  `;
+
+  const fragmentSource = `#version 300 es
+precision mediump float;
+
+const vec3 lightPositionEye = vec3(1.0, 1.0, 1.0);
+const vec3 albedo = vec3(1.0, 0.5, 0.0);
+
+in vec3 positionEye;
+in vec3 normalEye;
+
+out vec4 fragmentColor;
+
+void main() {
+  vec3 normal = normalize(normalEye);
+  vec3 lightDirection = normalize(lightPositionEye - positionEye);
+  float litness = max(0.0, dot(normal, lightDirection));
+  vec3 diffuse = litness * albedo;
+
+  fragmentColor = vec4(diffuse, 1.0);
+}
+  `;
+
+  solidMeshProgram = new ShaderProgram(vertexSource, fragmentSource);
+}
+
+// --------------------------------------------------------------------------- 
+
 function initializePathProgram() {
   if (pathProgram) {
     pathProgram.destroy();
@@ -683,19 +759,16 @@ function render() {
   pathProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation).multiplyMatrix(center));
   pathProgram.setUniform1f('halfThickness', 0.005);
   pathProgram.setUniform1f('aspectRatio', aspectRatio);
-
   for (let object of pathObjects) {
     object.vertexArray.bind();
     object.vertexArray.drawSequence(gl.TRIANGLES);
     object.vertexArray.unbind();
   }
-
   pathProgram.unbind();
 
+  // Polyline nodes.
   nodeProgram.bind();
   nodeProgram.setUniformMatrix4('projection', projection);
-
-  // Polyline nodes.
   nodeObject.vertexArray.bind();
   for (let polyline of polylines) {
     for (let vertex of polyline) {
@@ -704,15 +777,18 @@ function render() {
     }
   }
   nodeObject.vertexArray.unbind();
+  nodeProgram.unbind();
 
-  nodeProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation));
+  // Solids.
+  solidMeshProgram.bind();
+  solidMeshProgram.setUniformMatrix4('projection', projection);
+  solidMeshProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation));
   for (let meshObject of meshObjects) {
     meshObject.vertexArray.bind();
     meshObject.vertexArray.drawIndexed(gl.TRIANGLES);
     meshObject.vertexArray.unbind();
   }
-
-  nodeProgram.unbind();
+  solidMeshProgram.unbind();
 }
 
 // --------------------------------------------------------------------------- 
@@ -744,12 +820,13 @@ function updateProjection() {
 
 function mouseDown(e) {
   trackball.start(e.clientX, canvas.height - 1 - e.clientY);
+  isMouseDown = true;
 }
 
 // --------------------------------------------------------------------------- 
 
 function mouseMove(e) {
-  if (e.buttons === 1) {
+  if (e.buttons === 1 && isMouseDown) {
     trackball.drag(e.clientX, canvas.height - 1 - e.clientY, 3);
     render();
   }
@@ -758,6 +835,7 @@ function mouseMove(e) {
 // --------------------------------------------------------------------------- 
 
 function mouseUp(e) {
+  isMouseDown = false;
 }
 
 // --------------------------------------------------------------------------- 

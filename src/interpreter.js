@@ -75,13 +75,14 @@ export class InterpreterEnvironment extends Environment {
   }
 
   addMesh(mesh) {
-    this.meshes = mesh;
+    this.meshes.push(mesh);
   }
 
-  static create(source, log) {
+  static create(source, log, renderMode) {
     const env = new InterpreterEnvironment();
     env.initialize(log);
     env.source = source;
+    env.renderMode = renderMode;
     return env;
   }
 
@@ -89,6 +90,8 @@ export class InterpreterEnvironment extends Environment {
     const pod = super.toPod();
     Object.assign(pod, {
       polylines: this.polylines.map(polyline => polyline.toPod()),
+      renderMode: this.renderMode,
+      meshes: this.meshes,
     });
     return pod;
   }
@@ -96,11 +99,11 @@ export class InterpreterEnvironment extends Environment {
 
 // --------------------------------------------------------------------------- 
 
-export function interpret(source, log) {
+export function interpret(source, log, renderMode) {
   try {
     let tokens = lex(source);
     let ast = parse(tokens);
-    const env = InterpreterEnvironment.create(source, log);
+    const env = InterpreterEnvironment.create(source, log, renderMode);
     ast.evaluate(env);
     return env;
   } catch (e) {

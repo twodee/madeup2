@@ -6,16 +6,15 @@
   <link rel="icon" href="data:,">
   <script src="dist/bundle.js"></script>
   <link href="style.css" rel="stylesheet" type="text/css">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
 </head>
 <body>
 
 <div id="container">
   <div id="left">
-    <div id="editor" draggable="false">
-moveto(x = 0, y = 0, z = 0)
-moveto(x = 0, y = 0, z = -1)
+    <div id="editor" draggable="false">moveto(x = 0, y = -1, z = 0)
+moveto(x = 0, y = 1, z = 0)
 dowel()</div>
     <div id="editor-messager-resizer" class="height-resizer resizer"></div>
     <div id="messager-container">
@@ -26,18 +25,11 @@ dowel()</div>
   <div id="right" draggable="false">
     <canvas id="canvas"></canvas>
     <div id="toolbar">
-      <span class="spinner-root">
-        <input type="button" id="evaluate-button" value="Evaluate">
-        <div id="evaluate-spinner" class="spinner"></div>
-      </span>
-      <input type="button" id="stop-button" class="hidden" value="Stop">
-      <span class="spinner-root">
-        <input type="button" id="record-button" value="Record" disabled>
-        <div id="record-spinner" class="spinner"></div>
-      </span>
+      <img id="pathify-button" src="/images/pathify_icon.png" class="tool-icon">
+      <img id="solidify-button" src="/images/solidify_icon.png" class="tool-icon">
+      <img id="fit-button" src="/images/fit_icon.png" class="tool-icon">
+
       <input type="button" id="save-button" value="Save">
-      <input type="button" id="export-button" value="Export">
-      <input type="button" id="fit-button" value="Fit">
     </div>
   </div>
 </div>
