@@ -1,4 +1,5 @@
 import { 
+  FormalParameter,
   FunctionDefinition,
   LocatedException,
   mop,
@@ -109,22 +110,35 @@ export class Environment {
 
   bindGlobalFunctions() {
     Object.assign(this.functions, {
-      dowel: new FunctionDefinition('dowel', [], new ExpressionDowel()),
-      moveto: new FunctionDefinition('moveto', ['x', 'y', 'z'], new ExpressionMoveto()),
-      print: new FunctionDefinition('print', ['message'], new ExpressionPrint()),
-      debug: new FunctionDefinition('debug', ['expression'], new ExpressionDebug()),
-      random: new FunctionDefinition('random', ['min', 'max'], new ExpressionRandom()),
-      seed: new FunctionDefinition('seed', ['value'], new ExpressionSeed()),
-      sin: new FunctionDefinition('sin', ['degrees'], new ExpressionSine()),
-      cos: new FunctionDefinition('cos', ['degrees'], new ExpressionCosine()),
-      tan: new FunctionDefinition('tan', ['degrees'], new ExpressionTangent()),
-      asin: new FunctionDefinition('asin', ['ratio'], new ExpressionArcSine()),
-      hypotenuse: new FunctionDefinition('hypotenuse', ['a', 'b'], new ExpressionHypotenuse()),
-      acos: new FunctionDefinition('acos', ['ratio'], new ExpressionArcCosine()),
-      atan: new FunctionDefinition('atan', ['ratio'], new ExpressionArcTangent()),
-      atan2: new FunctionDefinition('atan2', ['a', 'b'], new ExpressionArcTangent2()),
-      sqrt: new FunctionDefinition('sqrt', ['x'], new ExpressionSquareRoot()),
-      int: new FunctionDefinition('int', ['x'], new ExpressionInt()),
+      dowel: new FunctionDefinition('dowel', [
+        new FormalParameter('nsides', new ExpressionInteger(4))
+      ], new ExpressionDowel()),
+      moveto: new FunctionDefinition('moveto', [
+        new FormalParameter('x'),
+        new FormalParameter('y'),
+        new FormalParameter('z', new ExpressionReal(0)),
+        new FormalParameter('radius', new ExpressionReal(0.5)),
+      ], new ExpressionMoveto()),
+      print: new FunctionDefinition('print', [new FormalParameter('message')], new ExpressionPrint()),
+      debug: new FunctionDefinition('debug', [new FormalParameter('expression')], new ExpressionDebug()),
+      random: new FunctionDefinition('random', [
+        new FormalParameter('min'),
+        new FormalParameter('max'),
+      ], new ExpressionRandom()),
+      seed: new FunctionDefinition('seed', [new FormalParameter('value')], new ExpressionSeed()),
+      sin: new FunctionDefinition('sin', [new FormalParameter('degrees')], new ExpressionSine()),
+      cos: new FunctionDefinition('cos', [new FormalParameter('degrees')], new ExpressionCosine()),
+      tan: new FunctionDefinition('tan', [new FormalParameter('degrees')], new ExpressionTangent()),
+      asin: new FunctionDefinition('asin', [new FormalParameter('ratio')], new ExpressionArcSine()),
+      hypotenuse: new FunctionDefinition('hypotenuse', [new FormalParameter('a'), new FormalParameter('b')], new ExpressionHypotenuse()),
+      acos: new FunctionDefinition('acos', [new FormalParameter('ratio')], new ExpressionArcCosine()),
+      atan: new FunctionDefinition('atan', [new FormalParameter('ratio')], new ExpressionArcTangent()),
+      atan2: new FunctionDefinition('atan2', [
+        new FormalParameter('a'),
+        new FormalParameter('b'),
+      ], new ExpressionArcTangent2()),
+      sqrt: new FunctionDefinition('sqrt', [new FormalParameter('x')], new ExpressionSquareRoot()),
+      int: new FunctionDefinition('int', [new FormalParameter('x')], new ExpressionInt()),
     });
   }
 }

@@ -35,6 +35,15 @@ export class FunctionDefinition {
 
 // --------------------------------------------------------------------------- 
 
+export class FormalParameter {
+  constructor(name, defaultThunk) {
+    this.name = name;
+    this.defaultThunk = defaultThunk;
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
 export class Turtle {
   constructor(position, heading) {
     this.position = position;

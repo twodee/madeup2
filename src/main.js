@@ -53,6 +53,9 @@ let pathObjects;
 let nodeProgram;
 let pathProgram;
 let solidMeshProgram;
+let wireMeshProgram;
+
+let isWireframe = false;
 
 let projection;
 let modelview;
@@ -131,22 +134,42 @@ function postInterpret(pod) {
     polylines = pod.polylines;
     pathObjects = pod.polylines.filter(polyline => polyline.length > 0).map(polyline => generatePathObject(polyline));
   } else if (pod.renderMode === RenderMode.Solidify) {
-    const mesh = pod.meshes[0];
-    mesh.separateFaces();
+    for (let mesh of pod.meshes) {
+      mesh.separateFaces();
 
-    const vertexAttributes = new VertexAttributes();
-    vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.getFlatPositions());
-    vertexAttributes.addAttribute('vnormal', mesh.vertexCount, 4, mesh.getFlatNormals());
-    vertexAttributes.addIndices(mesh.getFlatFaces());
+      const vertexAttributes = new VertexAttributes();
+      vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.getFlatPositions());
+      vertexAttributes.addAttribute('vnormal', mesh.vertexCount, 4, mesh.getFlatNormals());
+      vertexAttributes.addIndices(mesh.getFlatFaces());
 
-    const vertexArray = new VertexArray(solidMeshProgram, vertexAttributes);
+      if (isWireframe) {
+        const barycentricCoordinates = new Array(mesh.vertexCount * 3);
+        for (let i = 0; i < mesh.vertexCount * 3; ) {
+          barycentricCoordinates[i + 0] = 1;
+          barycentricCoordinates[i + 1] = 0;
+          barycentricCoordinates[i + 2] = 0;
+          i += 3;
 
-    meshObjects = [
-      {
+          barycentricCoordinates[i + 0] = 0;
+          barycentricCoordinates[i + 1] = 1;
+          barycentricCoordinates[i + 2] = 0;
+          i += 3;
+
+          barycentricCoordinates[i + 0] = 0;
+          barycentricCoordinates[i + 1] = 0;
+          barycentricCoordinates[i + 2] = 1;
+          i += 3;
+        }
+        vertexAttributes.addAttribute('vbarycentric', mesh.vertexCount, 3, barycentricCoordinates);
+      }
+
+      const vertexArray = new VertexArray(isWireframe ? wireMeshProgram : solidMeshProgram, vertexAttributes);
+
+      meshObjects.push({
         vertexAttributes,
         vertexArray,
-      },
-    ];
+      });
+    }
   }
 
   render();
@@ -334,9 +357,9 @@ function initializeDOM() {
   // evaluateSpinner = document.getElementById('evaluate-spinner');
   new Messager(document.getElementById('messager'), document, highlight);
 
-  // if (localStorage.getItem('src') !== null) {
-    // editor.setValue(localStorage.getItem('src'), 1);
-  // }
+  if (localStorage.getItem('src') !== null) {
+    editor.setValue(localStorage.getItem('src'), 1);
+  }
   editor.getSession().on('change', onSourceChanged);
   editor.getSession().setMode("ace/mode/madeup");
   editor.getSession().selection.on('changeCursor', () => {
@@ -463,12 +486,13 @@ function initializeDOM() {
 function initializeGL() {
   trackball = new Trackball();
 
-  gl.cullFace(gl.BACK);
-  gl.enable(gl.CULL_FACE);
+  // gl.cullFace(gl.BACK);
+  // gl.enable(gl.CULL_FACE);
 
   initializeNodeProgram();
   initializePathProgram();
   initializeSolidMeshProgram();
+  initializeWireMeshProgram();
   initializePathifyNodeObject();
 
   reset();
@@ -606,33 +630,18 @@ uniform mat4 projection;
 uniform mat4 modelview;
 
 in vec3 vposition;
-// in vec2 corner;
-
-// out vec3 fcolor;
-// out vec2 ftexcoords;
 
 void main() {
-  // gl_Position = projection * (modelview * vec4(vposition, 1.0) + vec4(corner, 0.0, 0.0) * 0.1);
   gl_Position = projection * modelview * vec4(vposition, 1.0);
-
-  // ftexcoords = corner;
-  // fcolor = vec3(0.0, 0.0, 0.0);
 }
   `;
 
   const fragmentSource = `#version 300 es
 precision mediump float;
 
-in vec3 fcolor;
-in vec2 ftexcoords;
-
 out vec4 fragmentColor;
 
 void main() {
-  // if (length(ftexcoords) > 0.3) {
-    // discard;
-  // }
-  // fragmentColor = vec4(fcolor, 1.0);
   fragmentColor = vec4(0.0, 0.0, 0.0, 1.0);
 }
   `;
@@ -680,7 +689,8 @@ out vec4 fragmentColor;
 void main() {
   vec3 normal = normalize(normalEye);
   vec3 lightDirection = normalize(lightPositionEye - positionEye);
-  float litness = max(0.0, dot(normal, lightDirection));
+  // float litness = max(0.0, dot(normal, lightDirection));
+  float litness = abs(dot(normal, lightDirection));
   vec3 diffuse = litness * albedo;
 
   fragmentColor = vec4(diffuse, 1.0);
@@ -688,6 +698,74 @@ void main() {
   `;
 
   solidMeshProgram = new ShaderProgram(vertexSource, fragmentSource);
+}
+
+// --------------------------------------------------------------------------- 
+
+function initializeWireMeshProgram() {
+  if (wireMeshProgram) {
+    wireMeshProgram.destroy();
+  }
+
+  const vertexSource = `#version 300 es
+uniform mat4 projection;
+uniform mat4 modelview;
+
+in vec3 vposition;
+in vec3 vnormal;
+in vec3 vbarycentric;
+
+out vec3 positionEye;
+out vec3 normalEye;
+out vec3 fbarycentric;
+
+void main() {
+  vec4 positionEye4 = modelview * vec4(vposition, 1.0);
+  gl_Position = projection * positionEye4;
+
+  normalEye = normalize((modelview * vec4(vnormal, 0.0)).xyz);
+  positionEye = positionEye4.xyz;
+  fbarycentric = vbarycentric;
+}
+  `;
+
+  const fragmentSource = `#version 300 es
+precision mediump float;
+
+const vec3 lightPositionEye = vec3(1.0, 1.0, 1.0);
+const vec3 albedo = vec3(1.0, 0.5, 0.0);
+
+in vec3 positionEye;
+in vec3 normalEye;
+in vec3 fbarycentric;
+
+out vec4 fragmentColor;
+
+float edgeFactor() {
+  vec3 d = fwidth(fbarycentric) * 50.0;
+  vec3 a3 = smoothstep(vec3(0.0), d * 1.5, fbarycentric);
+  return min(min(a3.x, a3.y), a3.z);
+}
+
+void main() {
+  // fragmentColor = vec4(fwidth(fbarycentric) * 100.0, 1.0);
+  // return;
+
+  // if (any(lessThan(fbarycentric, vec3(0.02)))) {
+  if (edgeFactor() < 0.02) {
+    vec3 normal = normalize(normalEye);
+    vec3 lightDirection = normalize(lightPositionEye - positionEye);
+    float litness = max(0.0, dot(normal, lightDirection));
+    vec3 diffuse = litness * albedo;
+
+    fragmentColor = vec4(diffuse, 1.0);
+  } else {
+    discard;
+  }
+}
+  `;
+
+  wireMeshProgram = new ShaderProgram(vertexSource, fragmentSource);
 }
 
 // --------------------------------------------------------------------------- 
@@ -780,15 +858,27 @@ function render() {
   nodeProgram.unbind();
 
   // Solids.
-  solidMeshProgram.bind();
-  solidMeshProgram.setUniformMatrix4('projection', projection);
-  solidMeshProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation));
-  for (let meshObject of meshObjects) {
-    meshObject.vertexArray.bind();
-    meshObject.vertexArray.drawIndexed(gl.TRIANGLES);
-    meshObject.vertexArray.unbind();
+  if (isWireframe) {
+    wireMeshProgram.bind();
+    wireMeshProgram.setUniformMatrix4('projection', projection);
+    wireMeshProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation));
+    for (let meshObject of meshObjects) {
+      meshObject.vertexArray.bind();
+      meshObject.vertexArray.drawIndexed(gl.TRIANGLES);
+      meshObject.vertexArray.unbind();
+    }
+    wireMeshProgram.unbind();
+  } else {
+    solidMeshProgram.bind();
+    solidMeshProgram.setUniformMatrix4('projection', projection);
+    solidMeshProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation));
+    for (let meshObject of meshObjects) {
+      meshObject.vertexArray.bind();
+      meshObject.vertexArray.drawIndexed(gl.TRIANGLES);
+      meshObject.vertexArray.unbind();
+    }
+    solidMeshProgram.unbind();
   }
-  solidMeshProgram.unbind();
 }
 
 // --------------------------------------------------------------------------- 
@@ -807,19 +897,20 @@ function updateProjection() {
   aspectRatio = canvas.width / canvas.height;
 
   // If more width than height, expand width.
-  if (aspectRatio >= 1) {
-    projection = Matrix4.ortho(-aspectRatio, aspectRatio, -1, 1);
-  } else {
-    projection = Matrix4.ortho(-1, 1, -1 / aspectRatio, 1 / aspectRatio);
-  }
+  // if (aspectRatio >= 1) {
+    // projection = Matrix4.ortho(-aspectRatio, aspectRatio, -1, 1);
+  // } else {
+    // projection = Matrix4.ortho(-1, 1, -1 / aspectRatio, 1 / aspectRatio);
+  // }
 
-  projection = Matrix4.fovPerspective(45, aspectRatio, 0.01, 1000);
+  projection = Matrix4.fovPerspective(45, aspectRatio, 0.01, 100);
 }
 
 // --------------------------------------------------------------------------- 
 
 function mouseDown(e) {
-  trackball.start(e.clientX, canvas.height - 1 - e.clientY);
+  const bounds = e.target.getBoundingClientRect();
+  trackball.start(e.clientX - bounds.left, canvas.height - 1 - e.clientY);
   isMouseDown = true;
 }
 
@@ -827,7 +918,8 @@ function mouseDown(e) {
 
 function mouseMove(e) {
   if (e.buttons === 1 && isMouseDown) {
-    trackball.drag(e.clientX, canvas.height - 1 - e.clientY, 3);
+    const bounds = e.target.getBoundingClientRect();
+    trackball.drag(e.clientX - bounds.left, canvas.height - 1 - e.clientY, 3);
     render();
   }
 }

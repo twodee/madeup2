@@ -2,6 +2,7 @@
 
 import {
   FunctionDefinition,
+  FormalParameter,
   MessagedException,
   LocatedException,
   Precedence,
@@ -1015,14 +1016,33 @@ export class ExpressionFunctionCall extends Expression {
   evaluate(env) {
     let f = this.lookup(env);
 
-    if (Object.keys(this.actuals).length != f.formals.length) {
-      throw new LocatedException(this.where, `I expected function ${this.nameToken.source} to be called with ${f.formals.length} parameter${f.formals.length == 1 ? '' : 's'}.`);
-    }
-
     let callEnvironment = Environment.create(env);
     for (let [identifier, actualExpression] of Object.entries(this.actuals)) {
-      let value = actualExpression.evaluate(env);
-      callEnvironment.bind(identifier, value);
+      if (!f.formals.find(formal => formal.name === identifier)) {
+        throw new LocatedException(this.where, `I didn't expect function ${this.nameToken.source} to be provided a parameter named ${identifier}. I'm not sure what to do with that parameter.`);
+      } else {
+        let value;
+        if (actualExpression) {
+          value = actualExpression.evaluate(env);
+        } else {
+          value = env.variables[identifier];
+        }
+        callEnvironment.bind(identifier, value);
+      }
+    }
+
+    // Look for any missing formals. Supply implicit or default if possible.
+    for (let formal of f.formals) {
+      if (!callEnvironment.ownsVariable(formal.name)) {
+        if (env.ownsVariable(formal.name)) {
+          callEnvironment.bind(formal.name, env.variables[formal.name]);
+        } else if (formal.defaultThunk) {
+          const value = formal.defaultThunk.evaluate(env);
+          callEnvironment.bind(formal.name, value);
+        } else {
+          throw new LocatedException(this.where, `I expected function ${this.nameToken.source} to be provided a parameter named ${formal.name}.`);
+        }
+      }
     }
 
     let returnValue = f.body.evaluate(callEnvironment, this);
@@ -1719,9 +1739,9 @@ export class ExpressionVector extends ExpressionData {
       size: new FunctionDefinition('size', [], new ExpressionVectorSize(this)),
       magnitude: new FunctionDefinition('magnitude', [], new ExpressionVectorMagnitude(this)),
       toCartesian: new FunctionDefinition('toCartesian', [], new ExpressionVectorToCartesian(this)),
-      add: new FunctionDefinition('add', ['item'], new ExpressionVectorAdd(this)),
-      rotateAround: new FunctionDefinition('rotateAround', ['pivot', 'degrees'], new ExpressionVectorRotateAround(this)),
-      rotate: new FunctionDefinition('rotate', ['degrees'], new ExpressionVectorRotate(this)),
+      add: new FunctionDefinition('add', [new FormalParameter('item')], new ExpressionVectorAdd(this)),
+      rotateAround: new FunctionDefinition('rotateAround', [new FormalParameter('pivot'), new FormalParameter('degrees')], new ExpressionVectorRotateAround(this)),
+      rotate: new FunctionDefinition('rotate', [new FormalParameter('degrees')], new ExpressionVectorRotate(this)),
       rotate90: new FunctionDefinition('rotate90', [], new ExpressionVectorRotate90(this)),
     };
   }
@@ -2086,10 +2106,11 @@ export class ExpressionMoveto extends ExpressionFunction {
     const x = env.variables.x.value;
     const y = env.variables.y.value;
     const z = env.variables.z.value;
+    const radius = env.variables.radius.value;
 
     env.root.visit({
       position: new Vector3(x, y, z),
-      radius: 0.5,
+      radius,
     });
   }
 }
@@ -2098,6 +2119,8 @@ export class ExpressionMoveto extends ExpressionFunction {
 
 export class ExpressionDowel extends ExpressionFunction {
   evaluate(env) {
+    const nsides = env.variables.nsides.value;
+
     const polyline = env.root.seal();
     const direction = polyline.vertices[1].position.subtract(polyline.vertices[0].position).normalize();
 
@@ -2105,26 +2128,25 @@ export class ExpressionDowel extends ExpressionFunction {
 
     const positions = [];
     const faces = [];
-    const sideCount = 4;
 
-    const rotater = Matrix4.rotate(direction, 360 / sideCount);
+    const rotater = Matrix4.rotate(direction, 360 / nsides);
 
     let offset = normal.scalarMultiply(polyline.vertices[0].radius).toVector4(0);
-    for (let i = 0; i < sideCount; ++i) {
+    for (let i = 0; i < nsides; ++i) {
       positions.push(polyline.vertices[0].position.add(offset));
       offset = rotater.multiplyVector(offset);
     }
 
     offset = normal.scalarMultiply(polyline.vertices[1].radius).toVector4(0);
-    for (let i = 0; i < sideCount; ++i) {
+    for (let i = 0; i < nsides; ++i) {
       positions.push(polyline.vertices[1].position.add(offset));
       offset = rotater.multiplyVector(offset);
     }
 
     const n = polyline.vertices.length;
-    for (let i = 0; i < sideCount; ++i) {
-      faces.push([i, (i + 1) % sideCount, (i + 1) % sideCount + sideCount]);
-      faces.push([i % sideCount, (i + 1) % sideCount + sideCount, i + sideCount]);
+    for (let i = 0; i < nsides; ++i) {
+      faces.push([i, (i + 1) % nsides, (i + 1) % nsides + nsides]);
+      faces.push([i % nsides, (i + 1) % nsides + nsides, i + nsides]);
     }
 
     const mesh = new Trimesh(positions, faces);
