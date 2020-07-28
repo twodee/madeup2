@@ -2173,7 +2173,7 @@ export class ExpressionDowel extends ExpressionFunction {
     positions.push(polyline.vertices[polyline.vertices.length - 1].position);
 
     for (let i = 0; i < nsides; ++i) {
-      faces.push([positions.length - 2, i, (i + 1) % nsides]);
+      faces.push([positions.length - 2, (i + 1) % nsides, i]);
       faces.push([positions.length - 1, positions.length - 2 - nsides + i, positions.length - 2 - nsides + (i + 1) % nsides]);
     }
 

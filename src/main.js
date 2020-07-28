@@ -680,6 +680,7 @@ precision mediump float;
 
 const vec3 lightPositionEye = vec3(1.0, 1.0, 1.0);
 const vec3 albedo = vec3(1.0, 0.5, 0.0);
+const vec3 flippedAlbedo = vec3(0.0, 0.5, 1.0);
 
 in vec3 positionEye;
 in vec3 normalEye;
@@ -690,8 +691,9 @@ void main() {
   vec3 normal = normalize(normalEye);
   vec3 lightDirection = normalize(lightPositionEye - positionEye);
   // float litness = max(0.0, dot(normal, lightDirection));
-  float litness = abs(dot(normal, lightDirection));
-  vec3 diffuse = litness * albedo;
+  float d = dot(normal, lightDirection);
+  float litness = abs(d);
+  vec3 diffuse = litness * (d > 0.0 ? albedo : flippedAlbedo);
 
   fragmentColor = vec4(diffuse, 1.0);
 }
