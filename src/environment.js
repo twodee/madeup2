@@ -111,7 +111,8 @@ export class Environment {
   bindGlobalFunctions() {
     Object.assign(this.functions, {
       dowel: new FunctionDefinition('dowel', [
-        new FormalParameter('nsides', new ExpressionInteger(4))
+        new FormalParameter('nsides', new ExpressionInteger(4)),
+        new FormalParameter('twist', new ExpressionReal(0)),
       ], new ExpressionDowel()),
       moveto: new FunctionDefinition('moveto', [
         new FormalParameter('x'),

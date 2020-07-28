@@ -20,6 +20,7 @@ import {
 import {Vector3} from './twodeejs/vector.js';
 import {Matrix4} from './twodeejs/matrix.js';
 import {Trimesh} from './twodeejs/trimesh.js';
+import {Plane} from './twodeejs/plane.js';
 
 // --------------------------------------------------------------------------- 
 // PRIMITIVES
@@ -2120,33 +2121,60 @@ export class ExpressionMoveto extends ExpressionFunction {
 export class ExpressionDowel extends ExpressionFunction {
   evaluate(env) {
     const nsides = env.variables.nsides.value;
+    const twist = env.variables.twist.value;
 
     const polyline = env.root.seal();
-    const direction = polyline.vertices[1].position.subtract(polyline.vertices[0].position).normalize();
-
-    const normal = direction.perpendicular();
-
     const positions = [];
     const faces = [];
 
+    // TODO handle only one vertex
+
+    // Seed first ring.
+    let direction = polyline.vertices[1].position.subtract(polyline.vertices[0].position).normalize();
+    const normal = direction.perpendicular();
+    let offset = normal.scalarMultiply(polyline.vertices[0].radius).toVector4(0);
+    offset = Matrix4.rotate(direction, twist).multiplyVector(offset);
+
     const rotater = Matrix4.rotate(direction, 360 / nsides);
 
-    let offset = normal.scalarMultiply(polyline.vertices[0].radius).toVector4(0);
     for (let i = 0; i < nsides; ++i) {
       positions.push(polyline.vertices[0].position.add(offset));
       offset = rotater.multiplyVector(offset);
     }
 
-    offset = normal.scalarMultiply(polyline.vertices[1].radius).toVector4(0);
-    for (let i = 0; i < nsides; ++i) {
-      positions.push(polyline.vertices[1].position.add(offset));
-      offset = rotater.multiplyVector(offset);
+    // Walk through segments.
+    for (let i = 1; i < polyline.vertices.length; ++i) {
+      let plane;
+      let nextDirection;
+
+      if (i === polyline.vertices.length - 1) {
+        plane = new Plane(polyline.vertices[i].position, direction);
+      } else {
+        nextDirection = polyline.vertices[i + 1].position.subtract(polyline.vertices[i].position).normalize();
+        const tangent = direction.add(nextDirection).normalize();
+        plane = new Plane(polyline.vertices[i].position, tangent);
+      }
+
+      const base = (i - 1) * nsides;
+      for (let stopIndex = 0; stopIndex < nsides; ++stopIndex) {
+        const from = positions[positions.length - nsides];
+        const to = plane.intersectRay(from, direction);
+        positions.push(to);
+
+        faces.push([base + stopIndex, base + (stopIndex + 1) % nsides, base + (stopIndex + 1) % nsides + nsides]);
+        faces.push([base + stopIndex % nsides, base + (stopIndex + 1) % nsides + nsides, base + stopIndex + nsides]);
+      }
+
+      direction = nextDirection;
     }
 
-    const n = polyline.vertices.length;
+    // Fill end caps.
+    positions.push(polyline.vertices[0].position);
+    positions.push(polyline.vertices[polyline.vertices.length - 1].position);
+
     for (let i = 0; i < nsides; ++i) {
-      faces.push([i, (i + 1) % nsides, (i + 1) % nsides + nsides]);
-      faces.push([i % nsides, (i + 1) % nsides + nsides, i + nsides]);
+      faces.push([positions.length - 2, i, (i + 1) % nsides]);
+      faces.push([positions.length - 1, positions.length - 2 - nsides + i, positions.length - 2 - nsides + (i + 1) % nsides]);
     }
 
     const mesh = new Trimesh(positions, faces);

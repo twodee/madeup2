@@ -47,8 +47,8 @@ let canvas;
 let polylines;
 
 let meshObjects;
-let nodeObject;
 let pathObjects;
+let nodeObject;
 
 let nodeProgram;
 let pathProgram;
@@ -831,53 +831,57 @@ function render() {
 
   const center = Matrix4.translate(0, 0, 0);
 
-  // Polyline paths.
-  pathProgram.bind();
-  pathProgram.setUniformMatrix4('projection', projection);
-  pathProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation).multiplyMatrix(center));
-  pathProgram.setUniform1f('halfThickness', 0.005);
-  pathProgram.setUniform1f('aspectRatio', aspectRatio);
-  for (let object of pathObjects) {
-    object.vertexArray.bind();
-    object.vertexArray.drawSequence(gl.TRIANGLES);
-    object.vertexArray.unbind();
-  }
-  pathProgram.unbind();
-
-  // Polyline nodes.
-  nodeProgram.bind();
-  nodeProgram.setUniformMatrix4('projection', projection);
-  nodeObject.vertexArray.bind();
-  for (let polyline of polylines) {
-    for (let vertex of polyline) {
-      nodeProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation).multiplyMatrix(Matrix4.translate(vertex[0], vertex[1], vertex[2])));
-      nodeObject.vertexArray.drawIndexed(gl.TRIANGLES);
+  if (pathObjects.length > 0) {
+    // Polyline paths.
+    pathProgram.bind();
+    pathProgram.setUniformMatrix4('projection', projection);
+    pathProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation).multiplyMatrix(center));
+    pathProgram.setUniform1f('halfThickness', 0.005);
+    pathProgram.setUniform1f('aspectRatio', aspectRatio);
+    for (let object of pathObjects) {
+      object.vertexArray.bind();
+      object.vertexArray.drawSequence(gl.TRIANGLES);
+      object.vertexArray.unbind();
     }
+    pathProgram.unbind();
+
+    // Polyline nodes.
+    nodeProgram.bind();
+    nodeProgram.setUniformMatrix4('projection', projection);
+    nodeObject.vertexArray.bind();
+    for (let polyline of polylines) {
+      for (let vertex of polyline) {
+        nodeProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation).multiplyMatrix(Matrix4.translate(vertex[0], vertex[1], vertex[2])));
+        nodeObject.vertexArray.drawIndexed(gl.TRIANGLES);
+      }
+    }
+    nodeObject.vertexArray.unbind();
+    nodeProgram.unbind();
   }
-  nodeObject.vertexArray.unbind();
-  nodeProgram.unbind();
 
   // Solids.
-  if (isWireframe) {
-    wireMeshProgram.bind();
-    wireMeshProgram.setUniformMatrix4('projection', projection);
-    wireMeshProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation));
-    for (let meshObject of meshObjects) {
-      meshObject.vertexArray.bind();
-      meshObject.vertexArray.drawIndexed(gl.TRIANGLES);
-      meshObject.vertexArray.unbind();
+  if (meshObjects.length > 0) {
+    if (isWireframe) {
+      wireMeshProgram.bind();
+      wireMeshProgram.setUniformMatrix4('projection', projection);
+      wireMeshProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation));
+      for (let meshObject of meshObjects) {
+        meshObject.vertexArray.bind();
+        meshObject.vertexArray.drawIndexed(gl.TRIANGLES);
+        meshObject.vertexArray.unbind();
+      }
+      wireMeshProgram.unbind();
+    } else {
+      solidMeshProgram.bind();
+      solidMeshProgram.setUniformMatrix4('projection', projection);
+      solidMeshProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation));
+      for (let meshObject of meshObjects) {
+        meshObject.vertexArray.bind();
+        meshObject.vertexArray.drawIndexed(gl.TRIANGLES);
+        meshObject.vertexArray.unbind();
+      }
+      solidMeshProgram.unbind();
     }
-    wireMeshProgram.unbind();
-  } else {
-    solidMeshProgram.bind();
-    solidMeshProgram.setUniformMatrix4('projection', projection);
-    solidMeshProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation));
-    for (let meshObject of meshObjects) {
-      meshObject.vertexArray.bind();
-      meshObject.vertexArray.drawIndexed(gl.TRIANGLES);
-      meshObject.vertexArray.unbind();
-    }
-    solidMeshProgram.unbind();
   }
 }
 
