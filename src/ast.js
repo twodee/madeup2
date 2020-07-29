@@ -102,6 +102,14 @@ export class Expression {
 
 // --------------------------------------------------------------------------- 
 
+export class ExpressionUnit extends Expression {
+  evaluate(env) {
+    return this;
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
 export class ExpressionData extends Expression {
   static precedence = Precedence.Atom;
 
@@ -2122,6 +2130,7 @@ export class ExpressionDowel extends ExpressionFunction {
   evaluate(env) {
     const nsides = env.variables.nsides.value;
     const twist = env.variables.twist.value;
+    const round = env.variables.round.value;
 
     const polyline = env.root.seal();
     const positions = [];
@@ -2142,30 +2151,80 @@ export class ExpressionDowel extends ExpressionFunction {
       offset = rotater.multiplyVector(offset);
     }
 
-    // Walk through segments.
-    for (let i = 1; i < polyline.vertices.length; ++i) {
-      let plane;
-      let nextDirection;
+    const issueFace = (base, i) => {
+      faces.push([base + i, base + (i + 1) % nsides, base + (i + 1) % nsides + nsides]);
+      faces.push([base + i % nsides, base + (i + 1) % nsides + nsides, base + i + nsides]);
+    };
 
-      if (i === polyline.vertices.length - 1) {
-        plane = new Plane(polyline.vertices[i].position, direction);
-      } else {
-        nextDirection = polyline.vertices[i + 1].position.subtract(polyline.vertices[i].position).normalize();
-        const tangent = direction.add(nextDirection).normalize();
-        plane = new Plane(polyline.vertices[i].position, tangent);
-      }
+    const intersectPlane = (plane, direction, fromCenter, radius) => {
+      const base = positions.length - nsides;
+      const toCenter = plane.intersectRay(fromCenter, direction);
 
-      const base = (i - 1) * nsides;
-      for (let stopIndex = 0; stopIndex < nsides; ++stopIndex) {
+      for (let i = 0; i < nsides; ++i) {
         const from = positions[positions.length - nsides];
         const to = plane.intersectRay(from, direction);
-        positions.push(to);
-
-        faces.push([base + stopIndex, base + (stopIndex + 1) % nsides, base + (stopIndex + 1) % nsides + nsides]);
-        faces.push([base + stopIndex % nsides, base + (stopIndex + 1) % nsides + nsides, base + stopIndex + nsides]);
+        const offset = to.subtract(toCenter).normalize();
+        positions.push(toCenter.add(offset.scalarMultiply(radius)));
+        issueFace(base, i);
       }
+    }
 
-      direction = nextDirection;
+    // Walk through segments.
+    let markIndex = 0;
+    for (let i = 1; i < polyline.vertices.length; ++i) {
+      const radius = polyline.vertices[i].radius;
+      const distance = polyline.vertices[i].position.distance(polyline.vertices[i - 1].position);
+
+      if (Math.abs(distance) < 0.00001) {
+        const base = positions.length - nsides;
+        for (let j = 0; j < nsides; ++j) {
+          const from = positions[positions.length - nsides];
+          const to = from.subtract(polyline.vertices[markIndex].position).normalize().scalarMultiply(radius).add(polyline.vertices[markIndex].position);
+          positions.push(to);
+          issueFace(base, j);
+        }
+      } else if (i === polyline.vertices.length - 1) {
+        const plane = new Plane(polyline.vertices[i].position, direction);
+        intersectPlane(plane, direction, polyline.vertices[i - 1].position, polyline.vertices[i].radius);
+      } else {
+        markIndex = i;
+
+        const nextDistance = polyline.vertices[i + 1].position.distance(polyline.vertices[i].position);
+        if (nextDistance < 0.00001) {
+          const plane = new Plane(polyline.vertices[i].position, direction);
+          intersectPlane(plane, direction, polyline.vertices[i - 1].position, polyline.vertices[i].radius);
+        } else {
+          const nextDirection = polyline.vertices[i + 1].position.subtract(polyline.vertices[i].position).normalize();
+          const degrees = Math.acos(direction.negate().dot(nextDirection)) * 180 / Math.PI;
+
+          if (degrees <= round) {
+            const tangent = direction.add(nextDirection).normalize();
+            const plane = new Plane(polyline.vertices[i].position, tangent);
+            intersectPlane(plane, direction, polyline.vertices[i - 1].position, polyline.vertices[i].radius);
+          } else {
+            const pivot = direction.negate().add(nextDirection).normalize().scalarMultiply(radius * Math.sqrt(2)).add(polyline.vertices[i].position);
+            const plane = new Plane(pivot, direction);
+            intersectPlane(plane, direction, polyline.vertices[i - 1].position, polyline.vertices[i].radius);
+
+            const axis = direction.cross(nextDirection).normalize();
+            const nsteps = Math.ceil(degrees / round);
+            const deltaDegrees = degrees / nsteps;
+
+            for (let stepIndex = 0; stepIndex < nsteps; ++stepIndex) {
+              const base = positions.length - nsides;
+              const rotater = Matrix4.rotateAround(axis, deltaDegrees, pivot);
+              for (let stopIndex = 0; stopIndex < nsides; ++stopIndex) {
+                const from = positions[positions.length - nsides];
+                const to = rotater.multiplyVector(positions[positions.length - nsides].toVector4(1)).toVector3();
+                positions.push(to);
+                issueFace(base, stopIndex);
+              }
+            }
+          }
+
+          direction = nextDirection;
+        }
+      }
     }
 
     // Fill end caps.

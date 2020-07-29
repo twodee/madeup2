@@ -29,6 +29,7 @@ import {
   ExpressionString,
   ExpressionSubtract,
   ExpressionTangent,
+  ExpressionUnit,
   ExpressionVector,
 } from './ast.js';
 
@@ -113,6 +114,7 @@ export class Environment {
       dowel: new FunctionDefinition('dowel', [
         new FormalParameter('nsides', new ExpressionInteger(4)),
         new FormalParameter('twist', new ExpressionReal(0)),
+        new FormalParameter('round', new ExpressionReal(360)),
       ], new ExpressionDowel()),
       moveto: new FunctionDefinition('moveto', [
         new FormalParameter('x'),
