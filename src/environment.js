@@ -23,6 +23,7 @@ import {
   ExpressionPrint,
   ExpressionRandom,
   ExpressionReal,
+  ExpressionRevolve,
   ExpressionSeed,
   ExpressionSine,
   ExpressionSquareRoot,
@@ -116,6 +117,20 @@ export class Environment {
         new FormalParameter('twist', new ExpressionReal(0)),
         new FormalParameter('round', new ExpressionReal(360)),
       ], new ExpressionDowel()),
+      revolve: new FunctionDefinition('revolve', [
+        new FormalParameter('degrees'),
+        new FormalParameter('nsides', new ExpressionInteger(4)),
+        new FormalParameter('axis', new ExpressionVector([
+          new ExpressionReal(0),
+          new ExpressionReal(1),
+          new ExpressionReal(0),
+        ])),
+        new FormalParameter('pivot', new ExpressionVector([
+          new ExpressionReal(0),
+          new ExpressionReal(0),
+          new ExpressionReal(0),
+        ])),
+      ], new ExpressionRevolve()),
       moveto: new FunctionDefinition('moveto', [
         new FormalParameter('x'),
         new FormalParameter('y'),
