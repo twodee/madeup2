@@ -21,6 +21,7 @@ import {Vector3} from './twodeejs/vector.js';
 import {Matrix4} from './twodeejs/matrix.js';
 import {Trimesh} from './twodeejs/trimesh.js';
 import {Plane} from './twodeejs/plane.js';
+import {Prefab} from './twodeejs/prefab.js';
 
 // --------------------------------------------------------------------------- 
 // PRIMITIVES
@@ -2330,6 +2331,33 @@ export class ExpressionRevolve extends ExpressionFunction {
 
     const mesh = new Trimesh(positions, faces);
     env.root.addMesh(mesh);
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionBoxes extends ExpressionFunction {
+  evaluate(env) {
+    const polyline = env.root.seal();
+
+    for (let vertex of polyline.vertices) {
+      const mesh = Prefab.cube(vertex.radius, vertex.position);
+      env.root.addMesh(mesh);
+    }
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionSpheres extends ExpressionFunction {
+  evaluate(env) {
+    const polyline = env.root.seal();
+    const nsides = env.variables.nsides.value;
+
+    for (let vertex of polyline.vertices) {
+      const mesh = Prefab.sphere(vertex.radius, vertex.position, nsides, nsides / 2);
+      env.root.addMesh(mesh);
+    }
   }
 }
 

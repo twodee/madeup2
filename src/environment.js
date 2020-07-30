@@ -10,6 +10,7 @@ import {
   ExpressionArcSine,
   ExpressionArcTangent,
   ExpressionArcTangent2,
+  ExpressionBoxes,
   ExpressionCircle,
   ExpressionCosine,
   ExpressionCutout,
@@ -26,6 +27,7 @@ import {
   ExpressionRevolve,
   ExpressionSeed,
   ExpressionSine,
+  ExpressionSpheres,
   ExpressionSquareRoot,
   ExpressionString,
   ExpressionSubtract,
@@ -112,6 +114,14 @@ export class Environment {
 
   bindGlobalFunctions() {
     Object.assign(this.functions, {
+      boxes: new FunctionDefinition('boxes', [], new ExpressionBoxes()),
+      box: new FunctionDefinition('box', [], new ExpressionBoxes()),
+      spheres: new FunctionDefinition('spheres', [
+        new FormalParameter('nsides', new ExpressionInteger(4)),
+      ], new ExpressionSpheres()),
+      sphere: new FunctionDefinition('sphere', [
+        new FormalParameter('nsides', new ExpressionInteger(4)),
+      ], new ExpressionSpheres()),
       dowel: new FunctionDefinition('dowel', [
         new FormalParameter('nsides', new ExpressionInteger(4)),
         new FormalParameter('twist', new ExpressionReal(0)),
