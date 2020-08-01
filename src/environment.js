@@ -10,11 +10,12 @@ import {
   ExpressionArcSine,
   ExpressionArcTangent,
   ExpressionArcTangent2,
-  ExpressionBoxes,
+  ExpressionCubes,
   ExpressionCircle,
   ExpressionCosine,
   ExpressionCutout,
   ExpressionDebug,
+  ExpressionExtrude,
   ExpressionHypotenuse,
   ExpressionInt,
   ExpressionInteger,
@@ -114,8 +115,8 @@ export class Environment {
 
   bindGlobalFunctions() {
     Object.assign(this.functions, {
-      boxes: new FunctionDefinition('boxes', [], new ExpressionBoxes()),
-      box: new FunctionDefinition('box', [], new ExpressionBoxes()),
+      cubes: new FunctionDefinition('cubes', [], new ExpressionCubes()),
+      cube: new FunctionDefinition('cube', [], new ExpressionCubes()),
       spheres: new FunctionDefinition('spheres', [
         new FormalParameter('nsides', new ExpressionInteger(4)),
       ], new ExpressionSpheres()),
@@ -141,6 +142,10 @@ export class Environment {
           new ExpressionReal(0),
         ])),
       ], new ExpressionRevolve()),
+      extrude: new FunctionDefinition('extrude', [
+        new FormalParameter('axis'),
+        new FormalParameter('distance'),
+      ], new ExpressionExtrude()),
       moveto: new FunctionDefinition('moveto', [
         new FormalParameter('x'),
         new FormalParameter('y'),

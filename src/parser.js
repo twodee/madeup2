@@ -625,18 +625,50 @@ export function parse(tokens) {
 
       const actuals = {};
       while (!has(TokenType.RightParenthesis)) {
-        if (!has(TokenType.Identifier)) {
+        if (has(TokenType.LeftSquareBracket)) {
+          const leftBracketToken = consume();
+
+          const identifiers = [];
+          while (!has(TokenType.RightSquareBracket)) {
+            if (!has(TokenType.Identifier)) {
+              throw new LocatedException(tokens[i].where, 'I expected an identifier.');
+            }
+
+            // Grab identifier.
+            identifiers.push(consume());
+
+            if (has(TokenType.Comma)) {
+              consume();
+            } else if (!has(TokenType.RightSquareBracket) && !has(TokenType.Identifier)) {
+              throw new LocatedException(tokens[i].where, `I didn't expect ${token[i].source}.`);
+            }
+          }
+
+          consume(); // eat ]
+
+          if (!has(TokenType.Assign)) {
+            throw new LocatedException(tokens[i].where, 'I expected =.');
+          }
+
+          consume(); // eat =
+          const e = expression();
+
+          for (let [i, identifier] of identifiers.entries()) {
+            actuals[identifier.source] = new ExpressionSubscript(e, new ExpressionInteger(i), SourceLocation.span(leftBracketToken, e));
+          }
+        } else if (has(TokenType.Identifier)) {
+          const identifier = consume();
+          
+          if (has(TokenType.Assign)) {
+            consume(); // eat =
+            actuals[identifier.source] = expression();
+          } else {
+            actuals[identifier.source] = undefined;
+          }
+        } else {
           throw new LocatedException(tokens[i].where, 'I expected the parameters to be named.');
         }
 
-        const identifier = consume();
-        
-        if (has(TokenType.Assign)) {
-          consume(); // eat =
-          actuals[identifier.source] = expression();
-        } else {
-          actuals[identifier.source] = undefined;
-        }
 
         if (!has(TokenType.RightParenthesis)) {
           if (has(TokenType.Comma)) {

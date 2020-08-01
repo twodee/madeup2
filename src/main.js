@@ -43,6 +43,7 @@ let saveButton;
 let interpreterWorker;
 // let evaluateSpinner;
 let canvas;
+let centerTransform;
 
 let polylines;
 
@@ -57,8 +58,8 @@ let wireMeshProgram;
 
 let isWireframe = false;
 
-let projection;
-let modelview;
+let eyeToClip;
+let objectToEye;
 let zoom;
 let trackball;
 let aspectRatio;
@@ -66,6 +67,7 @@ let aspectRatio;
 let scene;
 let isSaved = true;
 let isMouseDown;
+let contentBounds;
 
 // --------------------------------------------------------------------------- 
 
@@ -169,6 +171,37 @@ function postInterpret(pod) {
         vertexAttributes,
         vertexArray,
       });
+    }
+
+    const needsFit = !contentBounds;
+
+    if (pod.meshes.length > 0) {
+      contentBounds = {
+        minimum: pod.meshes[0].bounds.minimum.clone(),
+        maximum: pod.meshes[0].bounds.maximum.clone(),
+      };
+    } else {
+      contentBounds = {
+        minimum: new Vector3(0, 0, 0),
+        maximum: new Vector3(0, 0, 0),
+      };
+    }
+
+    for (let mesh of pod.meshes) {
+      mesh.separateFaces();
+
+      for (let d = 0; d < 3; ++d) {
+        if (mesh.bounds.minimum.data[d] < contentBounds.minimum.data[d]) {
+          contentBounds.minimum.data[d] = mesh.bounds.minimum.data[d];
+        }
+        if (mesh.bounds.maximum.data[d] > contentBounds.maximum.data[d]) {
+          contentBounds.maximum.data[d] = mesh.bounds.maximum.data[d];
+        }
+      }
+    }
+
+    if (needsFit) {
+      fit();
     }
   }
 
@@ -328,10 +361,19 @@ function initialize() {
   polylines = [];
   meshObjects = [];
   isMouseDown = false;
+  // contentBounds = {
+    // minimum: new Vector3(0, 0, 0),
+    // maximum: new Vector3(0, 0, 0),
+  // };
+  centerTransform = Matrix4.identity();
 
   initializeDOM();
   initializeGL();
   resizeWindow();
+
+  if (runZeroMode) {
+    startInterpreting(RenderMode.Solidify);
+  }
 }
 
 // --------------------------------------------------------------------------- 
@@ -340,7 +382,7 @@ function initializeDOM() {
   editor = ace.edit('editor');
   editor.setTheme('ace/theme/twilight');
   editor.setOptions({
-    fontSize: source0 ? '10pt' : '14pt',
+    fontSize: source0 ? '14pt' : '14pt',
     tabSize: 2,
     useSoftTabs: true
   });
@@ -352,12 +394,14 @@ function initializeDOM() {
   pathifyButton = document.getElementById('pathify-button');
   solidifyButton = document.getElementById('solidify-button');
   fitButton = document.getElementById('fit-button');
-  // stopButton = document.getElementById('stop-button');
   saveButton = document.getElementById('save-button');
+  // stopButton = document.getElementById('stop-button');
   // evaluateSpinner = document.getElementById('evaluate-spinner');
+
   new Messager(document.getElementById('messager'), document, highlight);
 
-  if (localStorage.getItem('src') !== null) {
+  console.log("source0:", source0);
+  if (!source0 && localStorage.getItem('src') !== null) {
     editor.setValue(localStorage.getItem('src'), 1);
   }
   editor.getSession().on('change', onSourceChanged);
@@ -376,7 +420,8 @@ function initializeDOM() {
   });
 
   fitButton.addEventListener('click', () => {
-    if (scene) scene.fit();
+    fit();
+    render();
   });
 
   // stopButton.addEventListener('click', e => {
@@ -399,12 +444,6 @@ function initializeDOM() {
 
   if (source0) {
     editor.setValue(source0, 1);
-    if (runZeroMode) {
-      startInterpreting();
-      if (runZeroMode == 'loop') {
-        play(true);
-      }
-    }
   }
 
   const generateHeightResizer = resizer => {
@@ -439,6 +478,7 @@ function initializeDOM() {
       editor.resize();
 
       localStorage.setItem('left-width', parentPanel.children[0].style.width);
+      resizeWindow();
 
       e.preventDefault();
     };
@@ -626,13 +666,13 @@ function initializeNodeProgram() {
   }
 
   const vertexSource = `#version 300 es
-uniform mat4 projection;
-uniform mat4 modelview;
+uniform mat4 eyeToClip;
+uniform mat4 objectToEye;
 
 in vec3 vposition;
 
 void main() {
-  gl_Position = projection * modelview * vec4(vposition, 1.0);
+  gl_Position = eyeToClip * objectToEye * vec4(vposition, 1.0);
 }
   `;
 
@@ -657,8 +697,8 @@ function initializeSolidMeshProgram() {
   }
 
   const vertexSource = `#version 300 es
-uniform mat4 projection;
-uniform mat4 modelview;
+uniform mat4 eyeToClip;
+uniform mat4 objectToEye;
 
 in vec3 vposition;
 in vec3 vnormal;
@@ -667,10 +707,10 @@ out vec3 positionEye;
 out vec3 normalEye;
 
 void main() {
-  vec4 positionEye4 = modelview * vec4(vposition, 1.0);
-  gl_Position = projection * positionEye4;
+  vec4 positionEye4 = objectToEye * vec4(vposition, 1.0);
+  gl_Position = eyeToClip * positionEye4;
 
-  normalEye = normalize((modelview * vec4(vnormal, 0.0)).xyz);
+  normalEye = normalize((objectToEye * vec4(vnormal, 0.0)).xyz);
   positionEye = positionEye4.xyz;
 }
   `;
@@ -710,8 +750,8 @@ function initializeWireMeshProgram() {
   }
 
   const vertexSource = `#version 300 es
-uniform mat4 projection;
-uniform mat4 modelview;
+uniform mat4 eyeToClip;
+uniform mat4 objectToEye;
 
 in vec3 vposition;
 in vec3 vnormal;
@@ -722,10 +762,10 @@ out vec3 normalEye;
 out vec3 fbarycentric;
 
 void main() {
-  vec4 positionEye4 = modelview * vec4(vposition, 1.0);
-  gl_Position = projection * positionEye4;
+  vec4 positionEye4 = objectToEye * vec4(vposition, 1.0);
+  gl_Position = eyeToClip * positionEye4;
 
-  normalEye = normalize((modelview * vec4(vnormal, 0.0)).xyz);
+  normalEye = normalize((objectToEye * vec4(vnormal, 0.0)).xyz);
   positionEye = positionEye4.xyz;
   fbarycentric = vbarycentric;
 }
@@ -778,8 +818,8 @@ function initializePathProgram() {
   }
 
   const vertexSource = `#version 300 es
-uniform mat4 projection;
-uniform mat4 modelview;
+uniform mat4 eyeToClip;
+uniform mat4 objectToEye;
 uniform float halfThickness;
 uniform float aspectRatio;
 
@@ -789,7 +829,7 @@ in vec3 b;
 in float direction;
 
 void main() {
-  mat4 objectToClip = projection * modelview;
+  mat4 objectToClip = eyeToClip * objectToEye;
 
   vec4 positionClip = objectToClip * vec4(vposition, 1.0);
   vec4 aClip = objectToClip * vec4(a, 1.0);
@@ -824,6 +864,18 @@ void main() {
 
 // --------------------------------------------------------------------------- 
 
+function fit() {
+  reset();
+  const centroid = contentBounds.minimum.add(contentBounds.maximum).scalarMultiply(0.5);
+  centerTransform = Matrix4.translate(-centroid.x, -centroid.y, -centroid.z);
+
+  const radius = contentBounds.maximum.subtract(contentBounds.minimum).magnitude * 0.5;
+  console.log("radius:", radius);
+  zoom = -2 * radius;
+}
+
+// --------------------------------------------------------------------------- 
+
 function render() {
   gl.clearColor(0.9, 0.9, 0.9, 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -831,13 +883,13 @@ function render() {
 
   gl.enable(gl.DEPTH_TEST);
 
-  const center = Matrix4.translate(0, 0, 0);
+  const worldToEye = Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation).multiplyMatrix(centerTransform);
 
   if (pathObjects.length > 0) {
     // Polyline paths.
     pathProgram.bind();
-    pathProgram.setUniformMatrix4('projection', projection);
-    pathProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation).multiplyMatrix(center));
+    pathProgram.setUniformMatrix4('eyeToClip', eyeToClip);
+    pathProgram.setUniformMatrix4('objectToEye', worldToEye);
     pathProgram.setUniform1f('halfThickness', 0.005);
     pathProgram.setUniform1f('aspectRatio', aspectRatio);
     for (let object of pathObjects) {
@@ -849,11 +901,11 @@ function render() {
 
     // Polyline nodes.
     nodeProgram.bind();
-    nodeProgram.setUniformMatrix4('projection', projection);
+    nodeProgram.setUniformMatrix4('eyeToClip', eyeToClip);
     nodeObject.vertexArray.bind();
     for (let polyline of polylines) {
       for (let vertex of polyline) {
-        nodeProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation).multiplyMatrix(Matrix4.translate(vertex[0], vertex[1], vertex[2])));
+        nodeProgram.setUniformMatrix4('objectToEye', worldToEye.multiplyMatrix(Matrix4.translate(vertex[0], vertex[1], vertex[2])));
         nodeObject.vertexArray.drawIndexed(gl.TRIANGLES);
       }
     }
@@ -865,8 +917,8 @@ function render() {
   if (meshObjects.length > 0) {
     if (isWireframe) {
       wireMeshProgram.bind();
-      wireMeshProgram.setUniformMatrix4('projection', projection);
-      wireMeshProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation));
+      wireMeshProgram.setUniformMatrix4('eyeToClip', eyeToClip);
+      wireMeshProgram.setUniformMatrix4('objectToEye', worldToEye);
       for (let meshObject of meshObjects) {
         meshObject.vertexArray.bind();
         meshObject.vertexArray.drawIndexed(gl.TRIANGLES);
@@ -875,8 +927,8 @@ function render() {
       wireMeshProgram.unbind();
     } else {
       solidMeshProgram.bind();
-      solidMeshProgram.setUniformMatrix4('projection', projection);
-      solidMeshProgram.setUniformMatrix4('modelview', Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation));
+      solidMeshProgram.setUniformMatrix4('eyeToClip', eyeToClip);
+      solidMeshProgram.setUniformMatrix4('objectToEye', worldToEye);
       for (let meshObject of meshObjects) {
         meshObject.vertexArray.bind();
         meshObject.vertexArray.drawIndexed(gl.TRIANGLES);
@@ -904,12 +956,12 @@ function updateProjection() {
 
   // If more width than height, expand width.
   // if (aspectRatio >= 1) {
-    // projection = Matrix4.ortho(-aspectRatio, aspectRatio, -1, 1);
+    // eyeToClip = Matrix4.ortho(-aspectRatio, aspectRatio, -1, 1);
   // } else {
-    // projection = Matrix4.ortho(-1, 1, -1 / aspectRatio, 1 / aspectRatio);
+    // eyeToClip = Matrix4.ortho(-1, 1, -1 / aspectRatio, 1 / aspectRatio);
   // }
 
-  projection = Matrix4.fovPerspective(45, aspectRatio, 0.01, 100);
+  eyeToClip = Matrix4.fovPerspective(45, aspectRatio, 0.01, 100);
 }
 
 // --------------------------------------------------------------------------- 
@@ -949,7 +1001,6 @@ function mouseWheel(e) {
 // --------------------------------------------------------------------------- 
 
 function reset() {
-  zoom = -2;
   trackball.reset();
 }
 

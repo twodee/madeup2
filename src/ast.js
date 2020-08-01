@@ -892,7 +892,7 @@ export class ExpressionIdentifier extends Expression {
   }
 
   evaluate(env) {
-    let value = env.get(this.nameToken.source);
+    let value = env.variables[this.nameToken.source];
     if (value) {
       return value;
     } else {
@@ -1213,6 +1213,7 @@ export class ExpressionSubscript extends Expression {
     }
 
     try {
+      console.log("baseValue:", baseValue);
       let element = baseValue.get(indexValue.value);
       return element;
     } catch (e) {
@@ -2146,7 +2147,7 @@ export class ExpressionDowel extends ExpressionFunction {
     const positions = [];
     const faces = [];
 
-    if (polyline.vertices.length <= 1) {
+    if (polyline.vertices.length < 2) {
       throw new MessagedException("I expected this dowel to have at least two vertices.");
     }
 
@@ -2300,7 +2301,7 @@ export class ExpressionRevolve extends ExpressionFunction {
     const positions = [];
     const faces = [];
 
-    if (polyline.vertices.length <= 1) {
+    if (polyline.vertices.length < 2) {
       throw new MessagedException("I expected this revolve to have at least two vertices.");
     }
 
@@ -2336,7 +2337,7 @@ export class ExpressionRevolve extends ExpressionFunction {
 
 // --------------------------------------------------------------------------- 
 
-export class ExpressionBoxes extends ExpressionFunction {
+export class ExpressionCubes extends ExpressionFunction {
   evaluate(env) {
     const polyline = env.root.seal();
 
@@ -2358,6 +2359,46 @@ export class ExpressionSpheres extends ExpressionFunction {
       const mesh = Prefab.sphere(vertex.radius, vertex.position, nsides, nsides / 2);
       env.root.addMesh(mesh);
     }
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionExtrude extends ExpressionFunction {
+  evaluate(env) {
+    const axis = env.variables.axis;
+    const distance = env.variables.distance.value;
+    const polyline = env.root.seal();
+
+    if (polyline.vertices.length < 3) {
+      throw new MessagedException("I expected this extrude to have at least three vertices.");
+    }
+
+    let isClosed = polyline.vertices[0].position.distance(polyline.vertices[polyline.vertices.length - 1].position) < 0.00001;
+
+    const nstops = isClosed ? polyline.vertices.length - 1 : polyline.vertices.length;
+    const positions = [];
+    const faces = [];
+
+    const axis3 = new Vector3(axis.value[0].value, axis.value[1].value, axis.value[2].value);
+    const offset = axis3.normalize().scalarMultiply(distance);
+
+    positions.push(...polyline.vertices.slice(0, nstops).map(vertex => vertex.position));
+    positions.push(...positions.map(position => position.add(offset)));
+    // for (let vertex of polyline.vertices) {
+      // positions.push(vertex.position.add(offset));
+    // }
+
+    for (let i = 0; i < nstops; ++i) {
+      faces.push([i, (i + 1) % nstops, i + nstops]);
+      faces.push([(i + 1) % nstops, (i + 1) % nstops + nstops, i + nstops]);
+    }
+
+    positions.forEach(p => console.log(p.toString()));
+    faces.forEach(f => console.log(f.toString()));
+
+    const mesh = new Trimesh(positions, faces);
+    env.root.addMesh(mesh);
   }
 }
 
