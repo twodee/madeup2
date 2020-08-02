@@ -2342,7 +2342,7 @@ export class ExpressionCubes extends ExpressionFunction {
     const polyline = env.root.seal();
 
     for (let vertex of polyline.vertices) {
-      const mesh = Prefab.cube(vertex.radius, vertex.position);
+      const mesh = Prefab.cube(vertex.radius * 2, vertex.position);
       env.root.addMesh(mesh);
     }
   }

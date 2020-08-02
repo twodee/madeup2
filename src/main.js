@@ -25,9 +25,10 @@ import {ShaderProgram} from './twodeejs/shader.js';
 import {VertexArray} from './twodeejs/vertex_array.js';
 import {Matrix4} from './twodeejs/matrix.js';
 import {Trackball} from './twodeejs/trackball.js';
-import {Vector3} from './twodeejs/vector.js';
+import {Vector3, Vector4} from './twodeejs/vector.js';
 import {Trimesh} from './twodeejs/trimesh.js';
 import {Prefab} from './twodeejs/prefab.js';
+import {MathUtilities} from './twodeejs/mathutilities.js';
 
 // --------------------------------------------------------------------------- 
 
@@ -59,7 +60,7 @@ let wireMeshProgram;
 let isWireframe = false;
 
 let eyeToClip;
-let objectToEye;
+let modelToEye;
 let zoom;
 let trackball;
 let aspectRatio;
@@ -68,6 +69,9 @@ let scene;
 let isSaved = true;
 let isMouseDown;
 let contentBounds;
+let near = 0.01;
+
+let quadObject;
 
 // --------------------------------------------------------------------------- 
 
@@ -400,7 +404,6 @@ function initializeDOM() {
 
   new Messager(document.getElementById('messager'), document, highlight);
 
-  console.log("source0:", source0);
   if (!source0 && localStorage.getItem('src') !== null) {
     editor.setValue(localStorage.getItem('src'), 1);
   }
@@ -535,6 +538,20 @@ function initializeGL() {
   initializeWireMeshProgram();
   initializePathifyNodeObject();
 
+  const mesh = Prefab.quadrilateral(0.0041421356237309505 * 2 - 0.00001, new Vector3(0, 0, 0)); 
+
+  const vertexAttributes = new VertexAttributes();
+  vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.getFlatPositions());
+  vertexAttributes.addAttribute('vnormal', mesh.vertexCount, 4, mesh.getFlatNormals());
+  vertexAttributes.addIndices(mesh.getFlatFaces());
+
+  const vertexArray = new VertexArray(solidMeshProgram, vertexAttributes);
+
+  quadObject = {
+    vertexAttributes,
+    vertexArray,
+  };
+
   reset();
 }
 
@@ -667,12 +684,12 @@ function initializeNodeProgram() {
 
   const vertexSource = `#version 300 es
 uniform mat4 eyeToClip;
-uniform mat4 objectToEye;
+uniform mat4 modelToEye;
 
 in vec3 vposition;
 
 void main() {
-  gl_Position = eyeToClip * objectToEye * vec4(vposition, 1.0);
+  gl_Position = eyeToClip * modelToEye * vec4(vposition, 1.0);
 }
   `;
 
@@ -698,7 +715,7 @@ function initializeSolidMeshProgram() {
 
   const vertexSource = `#version 300 es
 uniform mat4 eyeToClip;
-uniform mat4 objectToEye;
+uniform mat4 modelToEye;
 
 in vec3 vposition;
 in vec3 vnormal;
@@ -707,10 +724,10 @@ out vec3 positionEye;
 out vec3 normalEye;
 
 void main() {
-  vec4 positionEye4 = objectToEye * vec4(vposition, 1.0);
+  vec4 positionEye4 = modelToEye * vec4(vposition, 1.0);
   gl_Position = eyeToClip * positionEye4;
 
-  normalEye = normalize((objectToEye * vec4(vnormal, 0.0)).xyz);
+  normalEye = normalize((modelToEye * vec4(vnormal, 0.0)).xyz);
   positionEye = positionEye4.xyz;
 }
   `;
@@ -751,7 +768,7 @@ function initializeWireMeshProgram() {
 
   const vertexSource = `#version 300 es
 uniform mat4 eyeToClip;
-uniform mat4 objectToEye;
+uniform mat4 modelToEye;
 
 in vec3 vposition;
 in vec3 vnormal;
@@ -762,10 +779,10 @@ out vec3 normalEye;
 out vec3 fbarycentric;
 
 void main() {
-  vec4 positionEye4 = objectToEye * vec4(vposition, 1.0);
+  vec4 positionEye4 = modelToEye * vec4(vposition, 1.0);
   gl_Position = eyeToClip * positionEye4;
 
-  normalEye = normalize((objectToEye * vec4(vnormal, 0.0)).xyz);
+  normalEye = normalize((modelToEye * vec4(vnormal, 0.0)).xyz);
   positionEye = positionEye4.xyz;
   fbarycentric = vbarycentric;
 }
@@ -819,7 +836,7 @@ function initializePathProgram() {
 
   const vertexSource = `#version 300 es
 uniform mat4 eyeToClip;
-uniform mat4 objectToEye;
+uniform mat4 modelToEye;
 uniform float halfThickness;
 uniform float aspectRatio;
 
@@ -829,7 +846,7 @@ in vec3 b;
 in float direction;
 
 void main() {
-  mat4 objectToClip = eyeToClip * objectToEye;
+  mat4 objectToClip = eyeToClip * modelToEye;
 
   vec4 positionClip = objectToClip * vec4(vposition, 1.0);
   vec4 aClip = objectToClip * vec4(a, 1.0);
@@ -869,9 +886,8 @@ function fit() {
   const centroid = contentBounds.minimum.add(contentBounds.maximum).scalarMultiply(0.5);
   centerTransform = Matrix4.translate(-centroid.x, -centroid.y, -centroid.z);
 
-  const radius = contentBounds.maximum.subtract(contentBounds.minimum).magnitude * 0.5;
-  console.log("radius:", radius);
-  zoom = -2 * radius;
+  const radius = contentBounds.maximum.subtract(contentBounds.minimum).maximumComponent * 0.5 * Math.sqrt(3);
+  zoom = (near + radius) / Math.tan(MathUtilities.toRadians(45 * 0.5));
 }
 
 // --------------------------------------------------------------------------- 
@@ -883,13 +899,14 @@ function render() {
 
   gl.enable(gl.DEPTH_TEST);
 
-  const worldToEye = Matrix4.translate(0, 0, zoom).multiplyMatrix(trackball.rotation).multiplyMatrix(centerTransform);
+  const worldToEye = Matrix4.translate(0, 0, -zoom).multiplyMatrix(trackball.rotation).multiplyMatrix(centerTransform);
+  // const worldToEye = Matrix4.translate(0, 0, -near);
 
   if (pathObjects.length > 0) {
     // Polyline paths.
     pathProgram.bind();
     pathProgram.setUniformMatrix4('eyeToClip', eyeToClip);
-    pathProgram.setUniformMatrix4('objectToEye', worldToEye);
+    pathProgram.setUniformMatrix4('modelToEye', worldToEye);
     pathProgram.setUniform1f('halfThickness', 0.005);
     pathProgram.setUniform1f('aspectRatio', aspectRatio);
     for (let object of pathObjects) {
@@ -905,7 +922,7 @@ function render() {
     nodeObject.vertexArray.bind();
     for (let polyline of polylines) {
       for (let vertex of polyline) {
-        nodeProgram.setUniformMatrix4('objectToEye', worldToEye.multiplyMatrix(Matrix4.translate(vertex[0], vertex[1], vertex[2])));
+        nodeProgram.setUniformMatrix4('modelToEye', worldToEye.multiplyMatrix(Matrix4.translate(vertex[0], vertex[1], vertex[2])));
         nodeObject.vertexArray.drawIndexed(gl.TRIANGLES);
       }
     }
@@ -918,7 +935,7 @@ function render() {
     if (isWireframe) {
       wireMeshProgram.bind();
       wireMeshProgram.setUniformMatrix4('eyeToClip', eyeToClip);
-      wireMeshProgram.setUniformMatrix4('objectToEye', worldToEye);
+      wireMeshProgram.setUniformMatrix4('modelToEye', worldToEye);
       for (let meshObject of meshObjects) {
         meshObject.vertexArray.bind();
         meshObject.vertexArray.drawIndexed(gl.TRIANGLES);
@@ -928,7 +945,7 @@ function render() {
     } else {
       solidMeshProgram.bind();
       solidMeshProgram.setUniformMatrix4('eyeToClip', eyeToClip);
-      solidMeshProgram.setUniformMatrix4('objectToEye', worldToEye);
+      solidMeshProgram.setUniformMatrix4('modelToEye', worldToEye);
       for (let meshObject of meshObjects) {
         meshObject.vertexArray.bind();
         meshObject.vertexArray.drawIndexed(gl.TRIANGLES);
@@ -937,6 +954,14 @@ function render() {
       solidMeshProgram.unbind();
     }
   }
+
+  // solidMeshProgram.bind();
+  // solidMeshProgram.setUniformMatrix4('eyeToClip', eyeToClip);
+  // solidMeshProgram.setUniformMatrix4('modelToEye', Matrix4.translate(0, 0, -near));
+  // quadObject.vertexArray.bind();
+  // quadObject.vertexArray.drawIndexed(gl.TRIANGLES);
+  // quadObject.vertexArray.unbind();
+  // solidMeshProgram.unbind();
 }
 
 // --------------------------------------------------------------------------- 
@@ -962,6 +987,12 @@ function updateProjection() {
   // }
 
   eyeToClip = Matrix4.fovPerspective(45, aspectRatio, 0.01, 100);
+
+  // eyeToClip = Matrix4.fovPerspective(45, 1, near, 10);
+
+  const x = 0.0041421356237309505;
+  const clip = eyeToClip.multiplyVector(new Vector4(x, x, -near, 1));
+  const ndc = clip.scalarDivide(clip.w);
 }
 
 // --------------------------------------------------------------------------- 
@@ -976,7 +1007,7 @@ function mouseDown(e) {
 
 function mouseMove(e) {
   if (e.buttons === 1 && isMouseDown) {
-    const bounds = e.target.getBoundingClientRect();
+    const bounds = canvas.getBoundingClientRect();
     trackball.drag(e.clientX - bounds.left, canvas.height - 1 - e.clientY, 3);
     render();
   }
@@ -991,9 +1022,9 @@ function mouseUp(e) {
 // --------------------------------------------------------------------------- 
 
 function mouseWheel(e) {
-  zoom += e.wheelDelta * 0.01;
-  if (zoom >= 0) {
-    zoom = -0.01;
+  zoom -= e.wheelDelta * 0.005;
+  if (zoom <= 0) {
+    zoom = 0.01;
   }
   render();
 }
