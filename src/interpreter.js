@@ -70,6 +70,10 @@ export class InterpreterEnvironment extends Environment {
     return polyline;
   }
 
+  get currentPolyline() {
+    return this.polylines[this.polylines.length - 1];
+  }
+
   visit(vertex) {
     this.polylines[this.polylines.length - 1].add(vertex);
   }

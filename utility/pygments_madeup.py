@@ -16,3 +16,6 @@ class MadeupLexer(RegexLexer):
       (r' +', Text),
     ]
   }
+
+# https://pygments.org/docs/tokens/
+# https://pygments.org/docs/lexerdevelopment/

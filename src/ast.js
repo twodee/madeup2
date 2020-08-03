@@ -1213,7 +1213,6 @@ export class ExpressionSubscript extends Expression {
     }
 
     try {
-      console.log("baseValue:", baseValue);
       let element = baseValue.get(indexValue.value);
       return element;
     } catch (e) {
@@ -2137,6 +2136,24 @@ export class ExpressionMoveto extends ExpressionFunction {
 
 // --------------------------------------------------------------------------- 
 
+export class ExpressionHome extends ExpressionFunction {
+  evaluate(env) {
+    const polyline = env.root.currentPolyline;
+
+    if (!polyline || polyline.vertices.length === 0) {
+      throw new LocatedException(this.where, "I expected home to be called on a non-empty path.");
+    }
+
+    const vertex = polyline.vertices[0];
+    env.root.visit({
+      position: vertex.position,
+      radius: vertex.radius,
+    });
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
 export class ExpressionDowel extends ExpressionFunction {
   evaluate(env) {
     const nsides = env.variables.nsides.value;
@@ -2217,7 +2234,6 @@ export class ExpressionDowel extends ExpressionFunction {
       // direction, with the stopping plane aligned with the starting plane.
       else if (i === polyline.vertices.length - 1) {
         if (isClosed) {
-          console.log("i:", i);
           const base = positions.length - nsides;
           for (let j = 0; j < nsides; ++j) {
             faces.push([base + j, (j + 1) % nsides, (j + 1) % nsides]);
@@ -2394,8 +2410,8 @@ export class ExpressionExtrude extends ExpressionFunction {
       faces.push([(i + 1) % nstops, (i + 1) % nstops + nstops, i + nstops]);
     }
 
-    positions.forEach(p => console.log(p.toString()));
-    faces.forEach(f => console.log(f.toString()));
+    // positions.forEach(p => console.log(p.toString()));
+    // faces.forEach(f => console.log(f.toString()));
 
     const mesh = new Trimesh(positions, faces);
     env.root.addMesh(mesh);

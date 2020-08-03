@@ -16,6 +16,7 @@ import {
   ExpressionCutout,
   ExpressionDebug,
   ExpressionExtrude,
+  ExpressionHome,
   ExpressionHypotenuse,
   ExpressionInt,
   ExpressionInteger,
@@ -152,6 +153,7 @@ export class Environment {
         new FormalParameter('z', new ExpressionReal(0)),
         new FormalParameter('radius', new ExpressionReal(0.5)),
       ], new ExpressionMoveto()),
+      home: new FunctionDefinition('home', [], new ExpressionHome()),
       print: new FunctionDefinition('print', [new FormalParameter('message')], new ExpressionPrint()),
       debug: new FunctionDefinition('debug', [new FormalParameter('expression')], new ExpressionDebug()),
       random: new FunctionDefinition('random', [

@@ -25,7 +25,7 @@ import {ShaderProgram} from './twodeejs/shader.js';
 import {VertexArray} from './twodeejs/vertex_array.js';
 import {Matrix4} from './twodeejs/matrix.js';
 import {Trackball} from './twodeejs/trackball.js';
-import {Vector3, Vector4} from './twodeejs/vector.js';
+import {Vector2, Vector3, Vector4} from './twodeejs/vector.js';
 import {Trimesh} from './twodeejs/trimesh.js';
 import {Prefab} from './twodeejs/prefab.js';
 import {MathUtilities} from './twodeejs/mathutilities.js';
@@ -72,6 +72,8 @@ let contentBounds;
 let near = 0.01;
 
 let quadObject;
+let panslation;
+let mouseDownAt;
 
 // --------------------------------------------------------------------------- 
 
@@ -370,6 +372,7 @@ function initialize() {
     // maximum: new Vector3(0, 0, 0),
   // };
   centerTransform = Matrix4.identity();
+  panslation = new Vector2(0, 0);
 
   initializeDOM();
   initializeGL();
@@ -888,6 +891,7 @@ function fit() {
 
   const radius = contentBounds.maximum.subtract(contentBounds.minimum).maximumComponent * 0.5 * Math.sqrt(3);
   zoom = (near + radius) / Math.tan(MathUtilities.toRadians(45 * 0.5));
+  panslation = new Vector2(0, 0);
 }
 
 // --------------------------------------------------------------------------- 
@@ -899,7 +903,7 @@ function render() {
 
   gl.enable(gl.DEPTH_TEST);
 
-  const worldToEye = Matrix4.translate(0, 0, -zoom).multiplyMatrix(trackball.rotation).multiplyMatrix(centerTransform);
+  const worldToEye = Matrix4.translate(panslation.x, panslation.y, 0).multiplyMatrix(Matrix4.translate(0, 0, -zoom).multiplyMatrix(trackball.rotation).multiplyMatrix(centerTransform));
   // const worldToEye = Matrix4.translate(0, 0, -near);
 
   if (pathObjects.length > 0) {
@@ -999,16 +1003,24 @@ function updateProjection() {
 
 function mouseDown(e) {
   const bounds = e.target.getBoundingClientRect();
-  trackball.start(e.clientX - bounds.left, canvas.height - 1 - e.clientY);
+  mouseDownAt = new Vector2(e.clientX, canvas.height - 1 - e.clientY);
+  trackball.start(mouseDownAt.x - bounds.left, mouseDownAt.y);
   isMouseDown = true;
 }
 
 // --------------------------------------------------------------------------- 
 
 function mouseMove(e) {
-  if (e.buttons === 1 && isMouseDown) {
-    const bounds = canvas.getBoundingClientRect();
-    trackball.drag(e.clientX - bounds.left, canvas.height - 1 - e.clientY, 3);
+  if (isMouseDown) {
+    const mouseAt = new Vector2(e.clientX, canvas.height - 1 - e.clientY);
+
+    if (e.buttons & (1 << 0)) {
+      const bounds = canvas.getBoundingClientRect();
+      trackball.drag(mouseAt.x - bounds.left, mouseAt.y, 3);
+    } else if (e.buttons & (1 << 2)) {
+      panslation = panslation.add(mouseAt.subtract(mouseDownAt).scalarMultiply(0.001));
+    }
+
     render();
   }
 }
