@@ -22,6 +22,7 @@ import {
   ExpressionInteger,
   ExpressionDowel,
   ExpressionMoveto,
+  ExpressionMove,
   ExpressionMultiply,
   ExpressionPrint,
   ExpressionRandom,
@@ -36,6 +37,7 @@ import {
   ExpressionTangent,
   ExpressionUnit,
   ExpressionVector,
+  ExpressionYaw,
 } from './ast.js';
 
 // --------------------------------------------------------------------------- 
@@ -147,6 +149,13 @@ export class Environment {
         new FormalParameter('axis'),
         new FormalParameter('distance'),
       ], new ExpressionExtrude()),
+      move: new FunctionDefinition('move', [
+        new FormalParameter('distance'),
+        new FormalParameter('radius', new ExpressionReal(0.5)),
+      ], new ExpressionMove()),
+      yaw: new FunctionDefinition('yaw', [
+        new FormalParameter('degrees'),
+      ], new ExpressionYaw()),
       moveto: new FunctionDefinition('moveto', [
         new FormalParameter('x'),
         new FormalParameter('y'),

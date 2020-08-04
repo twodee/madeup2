@@ -2127,10 +2127,33 @@ export class ExpressionMoveto extends ExpressionFunction {
     const z = env.variables.z.value;
     const radius = env.variables.radius.value;
 
+    env.root.turtle.relocate(new Vector3(x, y, z));
     env.root.visit({
-      position: new Vector3(x, y, z),
       radius,
     });
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionMove extends ExpressionFunction {
+  evaluate(env) {
+    const distance = env.variables.distance.value;
+    const radius = env.variables.radius.value;
+
+    env.root.turtle.advance(distance);
+    env.root.visit({
+      radius,
+    });
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionYaw extends ExpressionFunction {
+  evaluate(env) {
+    const degrees = env.variables.degrees.value;
+    env.root.turtle.yaw(degrees);
   }
 }
 

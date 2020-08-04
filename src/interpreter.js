@@ -10,9 +10,9 @@ import {
   MessagedException,
 } from './common.js';
 
-import {
-  Environment,
-} from './environment.js';
+import {Environment} from './environment.js';
+import {Camera} from './twodeejs/camera.js';
+import {Vector3} from './twodeejs/vector.js';
 
 const seedrandom = require('seedrandom');
 
@@ -59,6 +59,7 @@ export class InterpreterEnvironment extends Environment {
     this.log = log;
     this.root = this;
     this.polylines = [new Polyline()];
+    this.turtle = new Camera(new Vector3(0, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1));
     this.meshes = [];
 
     this.bindGlobalFunctions();
@@ -74,8 +75,11 @@ export class InterpreterEnvironment extends Environment {
     return this.polylines[this.polylines.length - 1];
   }
 
-  visit(vertex) {
-    this.polylines[this.polylines.length - 1].add(vertex);
+  visit(configuration) {
+    this.polylines[this.polylines.length - 1].add({
+      ...configuration,
+      position: this.turtle.from,
+    });
   }
 
   addMesh(mesh) {
