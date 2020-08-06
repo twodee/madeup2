@@ -24,10 +24,12 @@ import {
   ExpressionMoveto,
   ExpressionMove,
   ExpressionMultiply,
+  ExpressionPitch,
   ExpressionPrint,
   ExpressionRandom,
   ExpressionReal,
   ExpressionRevolve,
+  ExpressionRoll,
   ExpressionSeed,
   ExpressionSine,
   ExpressionSpheres,
@@ -156,6 +158,12 @@ export class Environment {
       yaw: new FunctionDefinition('yaw', [
         new FormalParameter('degrees'),
       ], new ExpressionYaw()),
+      pitch: new FunctionDefinition('pitch', [
+        new FormalParameter('degrees'),
+      ], new ExpressionPitch()),
+      roll: new FunctionDefinition('roll', [
+        new FormalParameter('degrees'),
+      ], new ExpressionRoll()),
       moveto: new FunctionDefinition('moveto', [
         new FormalParameter('x'),
         new FormalParameter('y'),

@@ -99,7 +99,7 @@ export class InterpreterEnvironment extends Environment {
     Object.assign(pod, {
       polylines: this.polylines.map(polyline => polyline.toPod()),
       renderMode: this.renderMode,
-      meshes: this.meshes,
+      meshes: this.meshes.map(mesh => mesh.toPod()),
     });
     return pod;
   }

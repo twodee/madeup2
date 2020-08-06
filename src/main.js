@@ -28,6 +28,7 @@ import {Trackball} from './twodeejs/trackball.js';
 import {Vector2, Vector3, Vector4} from './twodeejs/vector.js';
 import {Trimesh} from './twodeejs/trimesh.js';
 import {Prefab} from './twodeejs/prefab.js';
+import {Camera} from './twodeejs/camera.js';
 import {MathUtilities} from './twodeejs/mathutilities.js';
 
 // --------------------------------------------------------------------------- 
@@ -74,6 +75,7 @@ let near = 0.01;
 let quadObject;
 let panslation;
 let mouseDownAt;
+let camera;
 
 // --------------------------------------------------------------------------- 
 
@@ -125,6 +127,8 @@ function stopInterpreting() {
 // --------------------------------------------------------------------------- 
 
 function postInterpret(pod) {
+  console.log("pod:", pod);
+
   for (let object of pathObjects) {
     object.vertexArray.destroy();
     object.vertexAttributes.destroy();
@@ -142,7 +146,8 @@ function postInterpret(pod) {
     polylines = pod.polylines;
     pathObjects = pod.polylines.filter(polyline => polyline.length > 0).map(polyline => generatePathObject(polyline));
   } else if (pod.renderMode === RenderMode.Solidify) {
-    for (let mesh of pod.meshes) {
+    const meshes = pod.meshes.map(pod => Trimesh.fromPod(pod));
+    for (let mesh of meshes) {
       mesh.separateFaces();
 
       const vertexAttributes = new VertexAttributes();
@@ -181,10 +186,10 @@ function postInterpret(pod) {
 
     const needsFit = !contentBounds;
 
-    if (pod.meshes.length > 0) {
+    if (meshes.length > 0) {
       contentBounds = {
-        minimum: pod.meshes[0].bounds.minimum.clone(),
-        maximum: pod.meshes[0].bounds.maximum.clone(),
+        minimum: meshes[0].bounds.minimum.clone(),
+        maximum: meshes[0].bounds.maximum.clone(),
       };
     } else {
       contentBounds = {
@@ -193,7 +198,7 @@ function postInterpret(pod) {
       };
     }
 
-    for (let mesh of pod.meshes) {
+    for (let mesh of meshes) {
       mesh.separateFaces();
 
       for (let d = 0; d < 3; ++d) {
@@ -316,7 +321,7 @@ function startInterpreting(renderMode) {
     }
   });
 
-  const hasWorker = false;
+  const hasWorker = true;
   if (hasWorker) {
     interpreterWorker.postMessage({
       command: 'interpret',
@@ -371,6 +376,7 @@ function initialize() {
     // minimum: new Vector3(0, 0, 0),
     // maximum: new Vector3(0, 0, 0),
   // };
+  camera = new Camera(new Vector3(0, 0, 0), new Vector3(0, 0, 1), new Vector3(0, 1, 0));
   centerTransform = Matrix4.identity();
   panslation = new Vector2(0, 0);
 
@@ -903,8 +909,12 @@ function render() {
 
   gl.enable(gl.DEPTH_TEST);
 
-  const worldToEye = Matrix4.translate(panslation.x, panslation.y, 0).multiplyMatrix(Matrix4.translate(0, 0, -zoom).multiplyMatrix(trackball.rotation).multiplyMatrix(centerTransform));
-  // const worldToEye = Matrix4.translate(0, 0, -near);
+  const worldToEye = camera.matrix.multiplyMatrix(
+    Matrix4.translate(panslation.x, panslation.y, 0)
+      .multiplyMatrix(Matrix4.translate(0, 0, zoom)
+      .multiplyMatrix(trackball.rotation)
+      .multiplyMatrix(centerTransform))
+  );
 
   if (pathObjects.length > 0) {
     // Polyline paths.

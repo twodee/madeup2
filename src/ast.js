@@ -2159,6 +2159,24 @@ export class ExpressionYaw extends ExpressionFunction {
 
 // --------------------------------------------------------------------------- 
 
+export class ExpressionPitch extends ExpressionFunction {
+  evaluate(env) {
+    const degrees = env.variables.degrees.value;
+    env.root.turtle.pitch(degrees);
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionRoll extends ExpressionFunction {
+  evaluate(env) {
+    const degrees = env.variables.degrees.value;
+    env.root.turtle.roll(degrees);
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
 export class ExpressionHome extends ExpressionFunction {
   evaluate(env) {
     const polyline = env.root.currentPolyline;
