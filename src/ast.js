@@ -22,6 +22,7 @@ import {Matrix4} from './twodeejs/matrix.js';
 import {Trimesh} from './twodeejs/trimesh.js';
 import {Plane} from './twodeejs/plane.js';
 import {Prefab} from './twodeejs/prefab.js';
+import {MathUtilities} from './twodeejs/mathutilities.js';
 
 // --------------------------------------------------------------------------- 
 // PRIMITIVES
@@ -2127,7 +2128,28 @@ export class ExpressionMoveto extends ExpressionFunction {
     const z = env.variables.z.value;
     const radius = env.variables.radius.value;
 
-    env.root.turtle.relocate(new Vector3(x, y, z));
+    env.root.currentPolyline.turtle.relocate(new Vector3(x, y, z));
+    env.root.visit({
+      radius,
+    });
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionPolarto extends ExpressionFunction {
+  evaluate(env) {
+    const radius = env.variables.radius.value;
+    const distance = env.variables.distance.value;
+    const degrees = env.variables.degrees.value;
+    const origin = env.variables.origin;
+
+    const radians = MathUtilities.toRadians(degrees);
+    const x = distance * Math.cos(radians) + origin.get(0).value;
+    const y = distance * Math.sin(radians) + origin.get(1).value;
+    const z = origin.get(2).value;
+
+    env.root.currentPolyline.turtle.relocate(new Vector3(x, y, z));
     env.root.visit({
       radius,
     });
@@ -2141,7 +2163,7 @@ export class ExpressionMove extends ExpressionFunction {
     const distance = env.variables.distance.value;
     const radius = env.variables.radius.value;
 
-    env.root.turtle.advance(distance);
+    env.root.currentPolyline.turtle.advance(distance);
     env.root.visit({
       radius,
     });
@@ -2153,7 +2175,7 @@ export class ExpressionMove extends ExpressionFunction {
 export class ExpressionYaw extends ExpressionFunction {
   evaluate(env) {
     const degrees = env.variables.degrees.value;
-    env.root.turtle.yaw(degrees);
+    env.root.currentPolyline.turtle.yaw(degrees);
   }
 }
 
@@ -2162,7 +2184,7 @@ export class ExpressionYaw extends ExpressionFunction {
 export class ExpressionPitch extends ExpressionFunction {
   evaluate(env) {
     const degrees = env.variables.degrees.value;
-    env.root.turtle.pitch(degrees);
+    env.root.currentPolyline.turtle.pitch(degrees);
   }
 }
 
@@ -2171,7 +2193,7 @@ export class ExpressionPitch extends ExpressionFunction {
 export class ExpressionRoll extends ExpressionFunction {
   evaluate(env) {
     const degrees = env.variables.degrees.value;
-    env.root.turtle.roll(degrees);
+    env.root.currentPolyline.turtle.roll(degrees);
   }
 }
 

@@ -25,6 +25,7 @@ import {
   ExpressionMove,
   ExpressionMultiply,
   ExpressionPitch,
+  ExpressionPolarto,
   ExpressionPrint,
   ExpressionRandom,
   ExpressionReal,
@@ -164,6 +165,16 @@ export class Environment {
       roll: new FunctionDefinition('roll', [
         new FormalParameter('degrees'),
       ], new ExpressionRoll()),
+      polarto: new FunctionDefinition('polarto', [
+        new FormalParameter('distance'),
+        new FormalParameter('degrees'),
+        new FormalParameter('origin', new ExpressionVector([
+          new ExpressionReal(0),
+          new ExpressionReal(0),
+          new ExpressionReal(0),
+        ])),
+        new FormalParameter('radius', new ExpressionReal(0.5)),
+      ], new ExpressionPolarto()),
       moveto: new FunctionDefinition('moveto', [
         new FormalParameter('x'),
         new FormalParameter('y'),

@@ -30,6 +30,7 @@ import {Trimesh} from './twodeejs/trimesh.js';
 import {Prefab} from './twodeejs/prefab.js';
 import {Camera} from './twodeejs/camera.js';
 import {MathUtilities} from './twodeejs/mathutilities.js';
+import {Polyline} from './polyline.js';
 
 // --------------------------------------------------------------------------- 
 
@@ -72,6 +73,7 @@ let isMouseDown;
 let contentBounds;
 let near = 0.01;
 
+let cursorObject;
 let quadObject;
 let panslation;
 let mouseDownAt;
@@ -129,6 +131,7 @@ function stopInterpreting() {
 function postInterpret(pod) {
   console.log("pod:", pod);
 
+
   for (let object of pathObjects) {
     object.vertexArray.destroy();
     object.vertexAttributes.destroy();
@@ -141,10 +144,36 @@ function postInterpret(pod) {
 
   pathObjects = [];
   meshObjects = [];
+  const needsFit = !contentBounds;
 
   if (pod.renderMode === RenderMode.Pathify) {
-    polylines = pod.polylines;
-    pathObjects = pod.polylines.filter(polyline => polyline.length > 0).map(polyline => generatePathObject(polyline));
+    polylines = pod.polylines.map(pod => Polyline.fromPod(pod));
+    pathObjects = polylines.filter(polyline => polyline.vertices.length > 0).map(polyline => generatePathObject(polyline.vertices));
+
+    const positions = polylines.flatMap(polyline => polyline.vertices);
+
+    if (positions.length > 0) {
+      contentBounds = {
+        minimum: new Vector3(...positions[0]),
+        maximum: new Vector3(...positions[0]),
+      };
+    } else {
+      contentBounds = {
+        minimum: new Vector3(0, 0, 0),
+        maximum: new Vector3(0, 0, 0),
+      };
+    }
+
+    for (let position of positions) {
+      for (let d = 0; d < 3; ++d) {
+        if (position[d] < contentBounds.minimum.data[d]) {
+          contentBounds.minimum.data[d] = position[d];
+        }
+        if (position[d] > contentBounds.maximum.data[d]) {
+          contentBounds.maximum.data[d] = position[d];
+        }
+      }
+    }
   } else if (pod.renderMode === RenderMode.Solidify) {
     const meshes = pod.meshes.map(pod => Trimesh.fromPod(pod));
     for (let mesh of meshes) {
@@ -184,8 +213,6 @@ function postInterpret(pod) {
       });
     }
 
-    const needsFit = !contentBounds;
-
     if (meshes.length > 0) {
       contentBounds = {
         minimum: meshes[0].bounds.minimum.clone(),
@@ -210,10 +237,10 @@ function postInterpret(pod) {
         }
       }
     }
+  }
 
-    if (needsFit) {
-      fit();
-    }
+  if (needsFit) {
+    fit();
   }
 
   render();
@@ -321,7 +348,7 @@ function startInterpreting(renderMode) {
     }
   });
 
-  const hasWorker = true;
+  const hasWorker = false;
   if (hasWorker) {
     interpreterWorker.postMessage({
       command: 'interpret',
@@ -346,6 +373,7 @@ function onSourceChanged() {
     // scene.stale();
   // }
   // clearSelection();
+  startInterpreting(RenderMode.Pathify);
   isSaved = false;
   syncTitle();
 }
@@ -546,6 +574,7 @@ function initializeGL() {
   initializeSolidMeshProgram();
   initializeWireMeshProgram();
   initializePathifyNodeObject();
+  initializeCursor();
 
   const mesh = Prefab.quadrilateral(0.0041421356237309505 * 2 - 0.00001, new Vector3(0, 0, 0)); 
 
@@ -562,6 +591,44 @@ function initializeGL() {
   };
 
   reset();
+}
+
+// --------------------------------------------------------------------------- 
+
+function initializeCursor() {
+  const halfWidth = 0.5;
+  const length = 1;
+  const peakLength = 0.3;
+  const peakHeight = 0.2;
+
+  const positions = [
+    new Vector3(-halfWidth, 0, 0),
+    new Vector3(halfWidth, 0, 0),
+    new Vector3(0, -peakHeight, -peakLength),
+    new Vector3(0, 0, -length),
+  ].map(p => p.scalarMultiply(0.1));
+
+  const faces = [
+    [0, 2, 1],
+    [1, 2, 3],
+    [0, 3, 2],
+    [0, 1, 3],
+  ];
+
+  const mesh = new Trimesh(positions, faces);
+  mesh.separateFaces();
+
+  const vertexAttributes = new VertexAttributes();
+  vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.getFlatPositions());
+  vertexAttributes.addAttribute('vnormal', mesh.vertexCount, 4, mesh.getFlatNormals());
+  vertexAttributes.addIndices(mesh.getFlatFaces());
+
+  const vertexArray = new VertexArray(solidMeshProgram, vertexAttributes);
+
+  cursorObject = {
+    vertexAttributes,
+    vertexArray,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -924,9 +991,11 @@ function render() {
     pathProgram.setUniform1f('halfThickness', 0.005);
     pathProgram.setUniform1f('aspectRatio', aspectRatio);
     for (let object of pathObjects) {
-      object.vertexArray.bind();
-      object.vertexArray.drawSequence(gl.TRIANGLES);
-      object.vertexArray.unbind();
+      if (object.vertexAttributes.vertexCount > 0) {
+        object.vertexArray.bind();
+        object.vertexArray.drawSequence(gl.TRIANGLES);
+        object.vertexArray.unbind();
+      }
     }
     pathProgram.unbind();
 
@@ -935,13 +1004,25 @@ function render() {
     nodeProgram.setUniformMatrix4('eyeToClip', eyeToClip);
     nodeObject.vertexArray.bind();
     for (let polyline of polylines) {
-      for (let vertex of polyline) {
+      for (let vertex of polyline.vertices) {
         nodeProgram.setUniformMatrix4('modelToEye', worldToEye.multiplyMatrix(Matrix4.translate(vertex[0], vertex[1], vertex[2])));
         nodeObject.vertexArray.drawIndexed(gl.TRIANGLES);
       }
     }
     nodeObject.vertexArray.unbind();
     nodeProgram.unbind();
+
+    solidMeshProgram.bind();
+    solidMeshProgram.setUniformMatrix4('eyeToClip', eyeToClip);
+    for (let polyline of polylines) {
+      if (polyline.vertices.length > 0) {
+        solidMeshProgram.setUniformMatrix4('modelToEye', worldToEye.multiplyMatrix(polyline.turtle.matrix.inverse()));
+        cursorObject.vertexArray.bind();
+        cursorObject.vertexArray.drawIndexed(gl.TRIANGLES);
+        cursorObject.vertexArray.unbind();
+      }
+    }
+    solidMeshProgram.unbind();
   }
 
   // Solids.

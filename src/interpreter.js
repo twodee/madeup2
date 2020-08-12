@@ -13,6 +13,7 @@ import {
 import {Environment} from './environment.js';
 import {Camera} from './twodeejs/camera.js';
 import {Vector3} from './twodeejs/vector.js';
+import {Polyline} from './polyline.js';
 
 const seedrandom = require('seedrandom');
 
@@ -34,22 +35,6 @@ export class Random {
 
 // --------------------------------------------------------------------------- 
 
-export class Polyline {
-  constructor() {
-    this.vertices = [];
-  }
-
-  add(vertex) {
-    this.vertices.push(vertex);
-  }
-
-  toPod() {
-    return this.vertices.map(vertex => vertex.position.data);
-  }
-}
-
-// --------------------------------------------------------------------------- 
-
 export class InterpreterEnvironment extends Environment {
   initialize(log) {
     super.initialize(null);
@@ -59,7 +44,6 @@ export class InterpreterEnvironment extends Environment {
     this.log = log;
     this.root = this;
     this.polylines = [new Polyline()];
-    this.turtle = new Camera(new Vector3(0, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1));
     this.meshes = [];
 
     this.bindGlobalFunctions();
@@ -76,9 +60,10 @@ export class InterpreterEnvironment extends Environment {
   }
 
   visit(configuration) {
-    this.polylines[this.polylines.length - 1].add({
+    const polyline = this.currentPolyline;
+    polyline.add({
       ...configuration,
-      position: this.turtle.from,
+      position: polyline.turtle.from,
     });
   }
 
