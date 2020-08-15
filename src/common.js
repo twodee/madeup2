@@ -1,8 +1,9 @@
 // --------------------------------------------------------------------------- 
 
 export class MessagedException extends Error {
-  constructor(message) {
+  constructor(message, callRecord) {
     super(message);
+    this.callRecord = callRecord;
   }
 
   get userMessage() {
@@ -13,8 +14,8 @@ export class MessagedException extends Error {
 // --------------------------------------------------------------------------- 
 
 export class LocatedException extends MessagedException {
-  constructor(where, message) {
-    super(message);
+  constructor(where, message, callRecord) {
+    super(message, callRecord);
     this.where = where;
   }
 
@@ -26,19 +27,74 @@ export class LocatedException extends MessagedException {
 // --------------------------------------------------------------------------- 
 
 export class FunctionDefinition {
-  constructor(name, formals, body) {
+  constructor(name, description, formals, body) {
     this.name = name;
+    this.description = description;
     this.formals = formals;
     this.body = body;
+  }
+
+  toDocString(environment) {
+    const div = doc.createElement('div');
+
+    const name = doc.createElement('div');
+    name.appendChild(doc.createTextNode(this.name));
+    div.appendChild(name);
+
+    for (let f of this.formals) {
+      div.appendChild(f.toDocString(doc, environment));
+    }
+
+    return div;
+    // return this.name + "\n" + this.formals.map(f => f.toDocString(environment)).join("\n");
+  }
+
+  toCallRecord(env) {
+    return {
+      name: this.name,
+      description: this.description,
+      parameters: this.formals.map(f => f.toCallRecord(env)),
+    };
   }
 }
 
 // --------------------------------------------------------------------------- 
 
 export class FormalParameter {
-  constructor(name, defaultThunk) {
+  constructor(name, description, defaultThunk) {
     this.name = name;
     this.defaultThunk = defaultThunk;
+    this.description = description;
+  }
+
+  toDocString(doc, environment) {
+    const input = document.createElement('input');
+    input.addAttribute('type', 'checkbox');
+
+    if (environment.ownsVariable(this.name)) {
+      input.addAttribute('checked');
+    } else if (this.defaultThunk) {
+      input.indeterminate = true;
+    }
+
+    // return `<input type="checkbox" ${environment.ownsVariable(this.name) ? 'checked' : (this.defaultThunk ? 'indeterminate' : '')}> ${this.name}`;
+    
+    const text = doc.createTextNode(` ${this.name}`);
+
+    const div = doc.createElement('div');
+    div.appendChild(input);
+    div.appendChild(text);
+
+    return div;
+  }
+
+  toCallRecord(env) {
+    return {
+      name: this.name,
+      isProvided: env.ownsVariable(this.name),
+      defaultExpression: this.defaultThunk?.toPretty(),
+      description: this.description,
+    };
   }
 }
 

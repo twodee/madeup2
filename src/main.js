@@ -344,6 +344,7 @@ function startInterpreting(renderMode) {
       stopInterpreting();
       postInterpret(event.data.payload);
     } else if (event.data.type === 'error') {
+      console.log("was error");
       stopInterpreting();
     }
   });
@@ -356,7 +357,7 @@ function startInterpreting(renderMode) {
       renderMode,
     });
   } else {
-    const scene = interpret(editor.getValue(), Messager.log, renderMode);
+    const scene = interpret(editor.getValue(), Messager.log, Messager.logDelay, renderMode);
     stopInterpreting();
     if (scene) {
       postInterpret(scene.toPod());

@@ -46,10 +46,16 @@ import {
   ExpressionVector,
 } from './ast.js';
 
+import {
+  Builtins
+} from './builtins.js';
+
 export function parse(tokens) {
 
   let i = 0;
   let indents = [-1];
+  let functions = [];
+  functions.push(Builtins);
 
   function has(type, offset = 0) {
     let index = i + offset;

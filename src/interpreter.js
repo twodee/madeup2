@@ -14,6 +14,7 @@ import {Environment} from './environment.js';
 import {Camera} from './twodeejs/camera.js';
 import {Vector3} from './twodeejs/vector.js';
 import {Polyline} from './polyline.js';
+import {Builtins} from './builtins.js';
 
 const seedrandom = require('seedrandom');
 
@@ -46,7 +47,7 @@ export class InterpreterEnvironment extends Environment {
     this.polylines = [new Polyline()];
     this.meshes = [];
 
-    this.bindGlobalFunctions();
+    this.bindGlobalFunctions(Builtins);
   }
 
   seal() {
@@ -92,7 +93,7 @@ export class InterpreterEnvironment extends Environment {
 
 // --------------------------------------------------------------------------- 
 
-export function interpret(source, log, renderMode) {
+export function interpret(source, log, logDelay, renderMode) {
   try {
     let tokens = lex(source);
     let ast = parse(tokens);
@@ -101,10 +102,10 @@ export function interpret(source, log, renderMode) {
     return env;
   } catch (e) {
     if (e instanceof MessagedException) {
-      log(e.userMessage);
+      logDelay(e.userMessage, e.callRecord);
     } else {
       console.error(e);
-      log(e);
+      logDelay(e);
     }
     return null;
   }

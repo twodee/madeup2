@@ -9,10 +9,6 @@ import {
 } from './common.js';
 
 import {
-  Environment,
-} from './environment.js';
-
-import {
   Token,
   SourceLocation,
 } from './token.js';
@@ -23,6 +19,10 @@ import {Trimesh} from './twodeejs/trimesh.js';
 import {Plane} from './twodeejs/plane.js';
 import {Prefab} from './twodeejs/prefab.js';
 import {MathUtilities} from './twodeejs/mathutilities.js';
+
+import {
+  Environment,
+} from './environment.js';
 
 // --------------------------------------------------------------------------- 
 // PRIMITIVES
@@ -1019,7 +1019,7 @@ export class ExpressionFunctionCall extends Expression {
   lookup(env) {
     let f = env.getFunction(this.nameToken.source);
     if (!f) {
-      throw new LocatedException(this.where, `I've not heard of any function named "${this.nameToken.source}".`);
+      throw new LocatedException(this.where, `I've not heard of any function named <span class="messager-code">${this.nameToken.source}</span>.`);
     }
     return f;
   }
@@ -1027,10 +1027,12 @@ export class ExpressionFunctionCall extends Expression {
   evaluate(env) {
     let f = this.lookup(env);
 
+    let unknownParameters = [];
+
     let callEnvironment = Environment.create(env);
     for (let [identifier, actualExpression] of Object.entries(this.actuals)) {
       if (!f.formals.find(formal => formal.name === identifier)) {
-        throw new LocatedException(this.where, `I didn't expect function ${this.nameToken.source} to be provided a parameter named ${identifier}. I'm not sure what to do with that parameter.`);
+        unknownParameters.push(identifier);
       } else {
         let value;
         if (actualExpression) {
@@ -1042,6 +1044,10 @@ export class ExpressionFunctionCall extends Expression {
       }
     }
 
+    if (unknownParameters.length > 0) {
+      throw new LocatedException(this.where, `I didn't expect function <span class="messager-code">${this.nameToken.source}</span> to be provided a parameter named <span class="messager-code">${unknownParameters[0]}</span>. I'm not sure what to do with that parameter.\n\nPerhaps the documentation might help.`, f.toCallRecord(callEnvironment));
+    }
+
     // Look for any missing formals. Supply implicit or default if possible.
     for (let formal of f.formals) {
       if (!callEnvironment.ownsVariable(formal.name)) {
@@ -1051,7 +1057,7 @@ export class ExpressionFunctionCall extends Expression {
           const value = formal.defaultThunk.evaluate(env);
           callEnvironment.bind(formal.name, value);
         } else {
-          throw new LocatedException(this.where, `I expected function ${this.nameToken.source} to be provided a parameter named ${formal.name}.`);
+          throw new LocatedException(this.where, `I expected function <span class="messager-code">${this.nameToken.source}</span> to be provided a parameter named <span class="messager-code">${formal.name}</span>.\n\nPerhaps the documentation might help.`, f.toCallRecord(callEnvironment));
         }
       }
     }
@@ -1518,31 +1524,6 @@ export class ExpressionRepeatAround extends Expression {
       }
     }
     return last;
-  }
-}
-
-// --------------------------------------------------------------------------- 
-
-export class ExpressionWith extends Expression {
-  static precedence = Precedence.Atom;
-
-  constructor(scope, body, where, unevaluated) {
-    super(where, unevaluated);
-    this.scope = scope;
-    this.body = body;
-  }
-
-  evaluate(env) {
-    let withEnv = this.scope.evaluate(env);
-    if (!(withEnv instanceof Environment)) {
-      throw new LocatedException(this.scope.where, `I encountered a with expression whose subject isn't an environment.`);
-    }
-    if (withEnv.hasOwnProperty('sourceSpans')) {
-      withEnv.sourceSpans.push(this.where);
-    }
-    withEnv.parent = env;
-    this.body.evaluate(withEnv);
-    return withEnv;
   }
 }
 

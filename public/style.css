@@ -54,6 +54,7 @@ body {
   width: 100%;
   height: 100%;
   padding: 10px;
+  white-space: pre-wrap;
 }
 
 #editor {
@@ -228,4 +229,74 @@ html.grabbing {
 
 .tool-icon:active {
   transform: rotate(20deg) scale(0.9);
+}
+
+.function-docs {
+  border-radius: 5px;
+  background-color: black;
+  font-family: sans-serif;
+  padding: 10px;
+  margin-top: 15px;
+  color: lightgreen;
+}
+
+.function-docs > h3 {
+  font-size: 150%;
+  margin-top: 0;
+}
+
+.function-docs-parameter-status {
+  margin: 0 3px;
+}
+
+.function-docs-parameter-description {
+  font-family: sans-serif;
+  font-size: 14pt;
+}
+
+.function-docs-parameter-grid {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  /* grid-column-gap: 5px; */
+  /* grid-row-gap: 5px; */
+  font-family: monospace;
+}
+
+.function-docs-parameter-grid > div:nth-child(3n+4),
+.function-docs-parameter-grid > div:nth-child(3n+5),
+.function-docs-parameter-grid > div:nth-child(3n+6) {
+  /* background-color: #333333; */
+  border-top: 1px solid #666666;
+  padding-top: 3px;
+  margin-top: 3px;
+}
+
+.function-docs-parameter-name {
+  /* text-align: right; */
+  padding-right: 10px;
+}
+
+.function-docs-parameter > input[type="checkbox"] {
+  margin-left: 0;
+}
+
+.messager-code {
+  font-weight: bold;
+  color: yellow;
+}
+
+.function-docs-parameter-default {
+  color: darkgray;
+  font-style: italic;
+}
+
+.monospace {
+  font-family: monospace;
+}
+
+.function-docs-heading {
+  margin-bottom: 0;
+}
+
+.function-docs-description {
 }
