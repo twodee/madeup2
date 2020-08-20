@@ -200,3 +200,12 @@ export const RenderMode = Object.freeze({
 
 // --------------------------------------------------------------------------- 
 
+export function removeChildren(root) {
+  let lastChild;
+  while (lastChild = root.lastChild) {
+    root.removeChild(lastChild);
+  }
+}
+
+// --------------------------------------------------------------------------- 
+

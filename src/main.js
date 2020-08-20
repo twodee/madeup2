@@ -5,6 +5,7 @@ import './mode-madeup.js';
 import {
   MessagedException,
   RenderMode,
+  removeChildren,
 } from './common.js';
 
 // import {
@@ -340,6 +341,8 @@ function startInterpreting(renderMode) {
   interpreterWorker.addEventListener('message', event => {
     if (event.data.type === 'output') {
       Messager.log(event.data.payload);
+    } else if (event.data.type === 'show-docs') {
+      showDocs(event.data.payload);
     } else if (event.data.type === 'environment') {
       stopInterpreting();
       postInterpret(event.data.payload);
@@ -357,12 +360,103 @@ function startInterpreting(renderMode) {
       renderMode,
     });
   } else {
-    const scene = interpret(editor.getValue(), Messager.log, Messager.logDelay, renderMode);
+    const scene = interpret(editor.getValue(), Messager.log, Messager.logDelay, showDocs, renderMode);
     stopInterpreting();
     if (scene) {
       postInterpret(scene.toPod());
     }
   }
+}
+
+// --------------------------------------------------------------------------- 
+
+function showDocs(callObject) {
+  const docsDiv = document.createElement('div');
+  docsDiv.classList.add('function-docs');
+
+  const nameDiv = document.createElement('h3');
+  nameDiv.classList.add('function-docs-heading', 'monospace');
+  nameDiv.appendChild(document.createTextNode(callObject.name));
+  docsDiv.appendChild(nameDiv);
+
+  const descriptionDiv = document.createElement('div');
+  descriptionDiv.classList.add('function-docs-description');
+  descriptionDiv.appendChild(document.createTextNode(callObject.description));
+  docsDiv.appendChild(descriptionDiv);
+
+  const parametersTitleDiv = document.createElement('h4');
+  parametersTitleDiv.classList.add('function-docs-heading');
+  parametersTitleDiv.appendChild(document.createTextNode('Parameters'));
+  docsDiv.appendChild(parametersTitleDiv);
+
+  if (callObject.parameters.length === 0) {
+    docsDiv.appendChild(document.createTextNode('None.'))
+  } else {
+    const grid = document.createElement('div');
+    grid.classList.add('function-docs-parameter-grid');
+
+    for (let parameter of callObject.parameters) {
+      // const parameterDiv = document.createElement('div');
+      // parameterDiv.classList.add('function-docs-parameter');
+
+      const div = document.createElement('div');
+      const inputElement = document.createElement('input');
+      inputElement.classList.add('function-docs-parameter-status');
+      inputElement.onclick = () => false;
+      inputElement.setAttribute('type', 'checkbox');
+      if (parameter.isProvided) {
+        inputElement.setAttribute('checked', 'checked');
+      } else if (parameter.defaultExpression) {
+        inputElement.indeterminate = true;
+      }
+      div.appendChild(inputElement);
+      grid.appendChild(div);
+
+      const nameElement = document.createElement('div');
+      nameElement.classList.add('monospace', 'function-docs-parameter-name');
+      nameElement.appendChild(document.createTextNode(`${parameter.name}`));
+      grid.appendChild(nameElement);
+
+      const descriptionElement = document.createElement('div');
+      descriptionElement.classList.add('function-docs-parameter-description');
+
+      if (parameter.description) {
+        const descriptionSpan = document.createElement('span');
+        descriptionSpan.appendChild(document.createTextNode(`${parameter.description}`));
+        descriptionElement.appendChild(descriptionSpan);
+      }
+
+      if (parameter.defaultExpression) {
+        const defaultSpan = document.createElement('span');  
+        defaultSpan.classList.add('function-docs-parameter-default');
+        defaultSpan.appendChild(document.createTextNode(' Default: '));
+        const expressionSpan = document.createElement('span');
+        expressionSpan.classList.add('monospace');
+        expressionSpan.appendChild(document.createTextNode(parameter.defaultExpression));
+        defaultSpan.appendChild(expressionSpan);
+        descriptionElement.appendChild(defaultSpan);
+      }
+
+      grid.appendChild(descriptionElement);
+    }
+
+    docsDiv.appendChild(grid);
+  }
+
+  const returnTitleDiv = document.createElement('h4');
+  returnTitleDiv.classList.add('function-docs-heading');
+  returnTitleDiv.appendChild(document.createTextNode('Returns'));
+  docsDiv.appendChild(returnTitleDiv);
+
+  if (callObject.returns) {
+    docsDiv.appendChild(document.createTextNode(callObject.returns))
+  } else {
+    docsDiv.appendChild(document.createTextNode('None.'))
+  }
+
+  const docsRoot = document.getElementById('docs-root');
+  removeChildren(docsRoot);
+  docsRoot.appendChild(docsDiv);
 }
 
 // --------------------------------------------------------------------------- 
@@ -507,24 +601,27 @@ function initializeDOM() {
     };
 
     return onMouseDown;
-  }
+  };
 
-  const generateWidthResizer = resizer => {
+  const generateLeftResizer = (resizer, i) => {
     const onMouseMove = e => {
       const parentPanel = resizer.parentNode;
-      const bounds = resizer.parentNode.getBoundingClientRect();
-      const relativeX = e.clientX - bounds.x;
-      parentPanel.children[0].style['width'] = `${relativeX - 4}px`;
-      parentPanel.children[2].style['width'] = `${bounds.height - (relativeX + 4)}px`;
-      editor.resize();
+      const bounds = parentPanel.children[i - 1].getBoundingClientRect();
+      const newWidth = e.clientX - 4 - bounds.x;
 
-      localStorage.setItem('left-width', parentPanel.children[0].style.width);
+      parentPanel.children[i - 1].style['width'] = `${newWidth}px`;
+
+      editor.resize();
+      localStorage.setItem('left-width', parentPanel.children[i - 1].style.width);
       resizeWindow();
 
       e.preventDefault();
     };
 
     const onMouseDown = e => {
+      const parentPanel = resizer.parentNode;
+      const bounds = resizer.parentNode.getBoundingClientRect();
+
       document.addEventListener('mousemove', onMouseMove);
       document.addEventListener('mouseup', () => {
         document.removeEventListener('mousemove', onMouseMove);
@@ -533,19 +630,121 @@ function initializeDOM() {
     };
 
     return onMouseDown;
-  }
+  };
+
+  const generateRightResizer = (resizer, i) => {
+    const onMouseMove = e => {
+      const parentPanel = resizer.parentNode;
+      const bounds = parentPanel.children[i + 1].getBoundingClientRect();
+  
+      const newWidth = bounds.right - e.clientX + 4;
+      parentPanel.children[i + 1].style['width'] = `${newWidth}px`;
+
+      resizeWindow();
+      e.preventDefault();
+    };
+
+    const onMouseDown = e => {
+      const parentPanel = resizer.parentNode;
+      const bounds = resizer.parentNode.getBoundingClientRect();
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', () => {
+        document.removeEventListener('mousemove', onMouseMove);
+      });
+      e.preventDefault();
+    };
+
+    return onMouseDown;
+  };
 
   const editorMessagerResizer = document.getElementById('editor-messager-resizer');
   editorMessagerResizer.addEventListener('mousedown', generateHeightResizer(editorMessagerResizer)); 
 
-  const leftRightResizer = document.getElementById('left-right-resizer');
-  leftRightResizer.addEventListener('mousedown', generateWidthResizer(leftRightResizer)); 
+  const leftMiddleResizer = document.getElementById('left-middle-resizer');
+  leftMiddleResizer.addEventListener('mousedown', generateLeftResizer(leftMiddleResizer, 1)); 
+
+  const middleRightResizer = document.getElementById('middle-right-resizer');
+  middleRightResizer.addEventListener('mousedown', generateRightResizer(middleRightResizer, 3));
 
   // Restore editor width from last time, unless we're embedded.
   const leftWidth0 = localStorage.getItem('left-width');
   if (leftWidth0 && !isEmbedded) {
     left.style['width'] = leftWidth0;
   }
+
+  const openPanelButton = document.getElementById('open-panel-button');
+  const closePanelButton = document.getElementById('close-panel-button');
+  const panel = document.getElementById('right');
+
+  const targetMillis = 300;
+
+  openPanelButton.addEventListener('click', () => {
+    openPanelButton.style.display = 'none';
+
+    panel.style.display = 'block';
+    const bounds = panel.getBoundingClientRect(); 
+
+    const startValue = bounds.right;
+    const endValue = bounds.x;
+    const startMillis = new Date().getTime();
+
+    panel.style.position = 'absolute';
+    panel.style.top = '0';
+    panel.style.bottom = '0';
+
+    const animation = () => {
+      const currentMillis = new Date().getTime();
+      const elapsedMillis = currentMillis - startMillis;
+
+      if (elapsedMillis <= targetMillis) {
+        const proportion = elapsedMillis / targetMillis;
+        const value = startValue + (endValue - startValue) * proportion;
+        panel.style.left = `${value}px`;
+        requestAnimationFrame(animation);
+      } else {
+        panel.style.left = `${endValue}px`;
+        panel.style.position = 'static';
+        middleRightResizer.style.display = 'block';
+        closePanelButton.style.display = 'block';
+      }
+    };
+
+    animation();
+  });
+
+  closePanelButton.addEventListener('click', () => {
+    closePanelButton.style.display = 'none';
+    middleRightResizer.style.display = 'none';
+
+    const bounds = panel.getBoundingClientRect(); 
+
+    const startValue = bounds.left;
+    const endValue = bounds.right;
+    const startMillis = new Date().getTime();
+
+    panel.style.position = 'absolute';
+    panel.style.top = '0';
+    panel.style.bottom = '0';
+
+    const animation = () => {
+      const currentMillis = new Date().getTime();
+      const elapsedMillis = currentMillis - startMillis;
+
+      if (elapsedMillis <= targetMillis) {
+        const proportion = elapsedMillis / targetMillis;
+        const value = startValue + (endValue - startValue) * proportion;
+        panel.style.left = `${value}px`;
+        requestAnimationFrame(animation);
+      } else {
+        panel.style.position = 'static';
+        panel.style.display = 'none';
+        openPanelButton.style.display = 'block';
+      }
+    };
+
+    animation();
+  });
 
   canvas = document.getElementById('canvas');
   window.gl = canvas.getContext('webgl2');

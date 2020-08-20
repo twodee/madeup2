@@ -27,16 +27,6 @@ body {
   height: 100%;
 }
 
-#left {
-  /* position: relative; */
-  min-width: 200px;
-  width: 400px;
-  height: 100%;
-
-  display: flex;
-  flex-direction: column;
-}
-
 #messager-container {
   /* Must be relative to anchor resizer. */
   /* position: relative; */
@@ -79,10 +69,38 @@ body {
   background-color: rgb(240, 240, 240);
 }
 
-#right {
+#left {
+  /* position: relative; */
+  min-width: 200px;
+  width: 400px;
+  height: 100%;
+
+  flex: 0 1 auto;
+
+  display: flex;
+  flex-direction: column;
+}
+
+#middle {
   user-select: none;
   position: relative;
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 200px;
+}
+
+#right {
+  box-sizing: border-box;
+  background-color: orange;
+  flex: 0 1 auto;
+  padding: 5px;
+
+  /* I'd prefer not to set width and just let it default to min-width. But
+   * that's not how it works. If I don't set the width, the sidebar will not
+   * size properly. Using auto for flex-basis means we'll get the minimum
+   * size from the width, which defaults to sizing to fit the content. If
+   * the content is big, the sidebar will be big. */
+  width: 300px;
+  min-width: 300px;
 }
 
 #toolbar {
@@ -91,19 +109,17 @@ body {
   top: 10px;
 }
 
-#time-toolbar {
+#panel-tools {
   position: absolute;
-  bottom: 10px;
-  left: 10px;
   right: 10px;
-  margin: 0;
-  width: calc(100% - 20px);
-  text-align: center;
+  top: 10px;
 }
 
-#scrubber {
-  width: 100%; 
-  margin: 3px 0;
+#open-panel-button {
+}
+
+#close-panel-button, #middle-right-resizer, #right {
+  display: none;
 }
 
 a {
@@ -214,7 +230,7 @@ html.grabbing {
 }
 
 .tool-icon {
-  width: 60px;
+  width: 50px;
   transition-property: transform; 
   transition-duration: 200ms;
   transition-timing-function: ease-in-out;

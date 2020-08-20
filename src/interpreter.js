@@ -93,7 +93,7 @@ export class InterpreterEnvironment extends Environment {
 
 // --------------------------------------------------------------------------- 
 
-export function interpret(source, log, logDelay, renderMode) {
+export function interpret(source, log, logDelay, showDocs, renderMode) {
   try {
     let tokens = lex(source);
     let ast = parse(tokens);
@@ -102,7 +102,10 @@ export function interpret(source, log, logDelay, renderMode) {
     return env;
   } catch (e) {
     if (e instanceof MessagedException) {
-      logDelay(e.userMessage, e.callRecord);
+      logDelay(e.userMessage);
+      if (e.callRecord) {
+        showDocs(e.callRecord);
+      }
     } else {
       console.error(e);
       logDelay(e);
