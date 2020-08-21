@@ -341,7 +341,10 @@ function startInterpreting(renderMode) {
   interpreterWorker.addEventListener('message', event => {
     if (event.data.type === 'output') {
       Messager.log(event.data.payload);
+    } else if (event.data.type === 'output-delayed') {
+      Messager.logDelay(event.data.payload);
     } else if (event.data.type === 'show-docs') {
+      console.log("event.data.payload:", event.data.payload);
       showDocs(event.data.payload);
     } else if (event.data.type === 'environment') {
       stopInterpreting();
@@ -352,7 +355,7 @@ function startInterpreting(renderMode) {
     }
   });
 
-  const hasWorker = false;
+  const hasWorker = true;
   if (hasWorker) {
     interpreterWorker.postMessage({
       command: 'interpret',
@@ -374,7 +377,7 @@ function showDocs(callObject) {
   const docsDiv = document.createElement('div');
   docsDiv.classList.add('function-docs');
 
-  const nameDiv = document.createElement('h3');
+  const nameDiv = document.createElement('h2');
   nameDiv.classList.add('function-docs-heading', 'monospace');
   nameDiv.appendChild(document.createTextNode(callObject.name));
   docsDiv.appendChild(nameDiv);
@@ -384,7 +387,7 @@ function showDocs(callObject) {
   descriptionDiv.appendChild(document.createTextNode(callObject.description));
   docsDiv.appendChild(descriptionDiv);
 
-  const parametersTitleDiv = document.createElement('h4');
+  const parametersTitleDiv = document.createElement('h3');
   parametersTitleDiv.classList.add('function-docs-heading');
   parametersTitleDiv.appendChild(document.createTextNode('Parameters'));
   docsDiv.appendChild(parametersTitleDiv);
@@ -443,7 +446,7 @@ function showDocs(callObject) {
     docsDiv.appendChild(grid);
   }
 
-  const returnTitleDiv = document.createElement('h4');
+  const returnTitleDiv = document.createElement('h3');
   returnTitleDiv.classList.add('function-docs-heading');
   returnTitleDiv.appendChild(document.createTextNode('Returns'));
   docsDiv.appendChild(returnTitleDiv);
@@ -620,10 +623,13 @@ function initializeDOM() {
 
     const onMouseDown = e => {
       const parentPanel = resizer.parentNode;
-      const bounds = resizer.parentNode.getBoundingClientRect();
+      const style = window.getComputedStyle(parentPanel.children[4]);
+      const originalMinWidth = style['min-width'];
+      parentPanel.children[4].style['min-width'] = style['width'];
 
       document.addEventListener('mousemove', onMouseMove);
       document.addEventListener('mouseup', () => {
+        parentPanel.children[4].style['min-width'] = originalMinWidth;
         document.removeEventListener('mousemove', onMouseMove);
       });
       e.preventDefault();
@@ -636,6 +642,9 @@ function initializeDOM() {
     const onMouseMove = e => {
       const parentPanel = resizer.parentNode;
       const bounds = parentPanel.children[i + 1].getBoundingClientRect();
+
+      localStorage.setItem('right-width', parentPanel.children[i + 1].style.width);
+      resizeWindow();
   
       const newWidth = bounds.right - e.clientX + 4;
       parentPanel.children[i + 1].style['width'] = `${newWidth}px`;
@@ -646,10 +655,13 @@ function initializeDOM() {
 
     const onMouseDown = e => {
       const parentPanel = resizer.parentNode;
-      const bounds = resizer.parentNode.getBoundingClientRect();
+      const style = window.getComputedStyle(parentPanel.children[0]);
+      const originalMinWidth = style['min-width'];
+      parentPanel.children[0].style['min-width'] = style['width'];
 
       document.addEventListener('mousemove', onMouseMove);
       document.addEventListener('mouseup', () => {
+        parentPanel.children[0].style['min-width'] = originalMinWidth;
         document.removeEventListener('mousemove', onMouseMove);
       });
       e.preventDefault();
@@ -667,12 +679,6 @@ function initializeDOM() {
   const middleRightResizer = document.getElementById('middle-right-resizer');
   middleRightResizer.addEventListener('mousedown', generateRightResizer(middleRightResizer, 3));
 
-  // Restore editor width from last time, unless we're embedded.
-  const leftWidth0 = localStorage.getItem('left-width');
-  if (leftWidth0 && !isEmbedded) {
-    left.style['width'] = leftWidth0;
-  }
-
   const openPanelButton = document.getElementById('open-panel-button');
   const closePanelButton = document.getElementById('close-panel-button');
   const panel = document.getElementById('right');
@@ -680,6 +686,7 @@ function initializeDOM() {
   const targetMillis = 300;
 
   openPanelButton.addEventListener('click', () => {
+    localStorage.setItem('is-panel-open', true);
     openPanelButton.style.display = 'none';
 
     panel.style.display = 'block';
@@ -708,12 +715,15 @@ function initializeDOM() {
         middleRightResizer.style.display = 'block';
         closePanelButton.style.display = 'block';
       }
+
+      resizeWindow();
     };
 
     animation();
   });
 
   closePanelButton.addEventListener('click', () => {
+    localStorage.setItem('is-panel-open', false);
     closePanelButton.style.display = 'none';
     middleRightResizer.style.display = 'none';
 
@@ -741,6 +751,8 @@ function initializeDOM() {
         panel.style.display = 'none';
         openPanelButton.style.display = 'block';
       }
+
+      resizeWindow();
     };
 
     animation();
@@ -748,6 +760,27 @@ function initializeDOM() {
 
   canvas = document.getElementById('canvas');
   window.gl = canvas.getContext('webgl2');
+
+  // Restore persisted configuration.
+  if (!isEmbedded) {
+    const leftWidth0 = localStorage.getItem('left-width');
+    if (leftWidth0) {
+      left.style['width'] = leftWidth0;
+    }
+
+    const isPanelOpen = localStorage.getItem('is-panel-open') === 'true';
+    if (isPanelOpen) {
+      right.style.display = 'block';
+      middleRightResizer.style.display = 'block';
+      closePanelButton.style.display = 'block';
+      openPanelButton.style.display = 'none';
+    }
+
+    const rightWidth0 = localStorage.getItem('right-width');
+    if (rightWidth0) {
+      right.style['width'] = rightWidth0;
+    }
+  }
 
   // Register callbacks.
   canvas.addEventListener('mousedown', mouseDown);

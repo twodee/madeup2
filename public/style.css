@@ -9,6 +9,7 @@ html {
 }
 
 body {
+  font-family: sans-serif;
   margin: 0;
 
   /* To disable overscrolling. */
@@ -70,8 +71,7 @@ body {
 }
 
 #left {
-  /* position: relative; */
-  min-width: 200px;
+  min-width: 400px;
   width: 400px;
   height: 100%;
 
@@ -85,14 +85,16 @@ body {
   user-select: none;
   position: relative;
   flex: 1 1 0;
-  min-width: 200px;
+  min-width: 300px;
 }
 
 #right {
+  overflow-y: scroll;
   box-sizing: border-box;
-  background-color: orange;
+  background-color: black;
   flex: 0 1 auto;
-  padding: 5px;
+  padding: 10px;
+  color: white;
 
   /* I'd prefer not to set width and just let it default to min-width. But
    * that's not how it works. If I don't set the width, the sidebar will not
@@ -101,6 +103,10 @@ body {
    * the content is big, the sidebar will be big. */
   width: 300px;
   min-width: 300px;
+}
+
+#right > h3 {
+  margin: 0;
 }
 
 #toolbar {
@@ -248,12 +254,13 @@ html.grabbing {
 }
 
 .function-docs {
-  border-radius: 5px;
-  background-color: black;
+  border-radius: 3px;
+  background-color: #222222;
+  box-shadow: 0 0 3px #888888;
   font-family: sans-serif;
   padding: 10px;
   margin-top: 15px;
-  color: lightgreen;
+  color: #eeeeee;
 }
 
 .function-docs > h3 {
@@ -262,7 +269,7 @@ html.grabbing {
 }
 
 .function-docs-parameter-status {
-  margin: 0 3px;
+  margin: 0 3px 0 0;
 }
 
 .function-docs-parameter-description {
@@ -310,8 +317,18 @@ html.grabbing {
   font-family: monospace;
 }
 
-.function-docs-heading {
-  margin-bottom: 0;
+.function-docs > h2 {
+  font-size: 18pt;
+  margin-top: 0;
+  margin-bottom: 5px;
+  color: orange;
+}
+
+.function-docs > h3 {
+  font-size: 14pt;
+  margin-top: 20px;
+  margin-bottom: 5px;
+  color: #939393;
 }
 
 .function-docs-description {

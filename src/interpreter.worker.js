@@ -8,6 +8,7 @@ self.addEventListener('message', event => {
       const result = interpret(
         event.data.source,
         message => self.postMessage({type: 'output', payload: message}),
+        message => self.postMessage({type: 'output-delayed', payload: message}),
         callRecord => self.postMessage({type: 'show-docs', payload: callRecord}),
         event.data.renderMode
       );
