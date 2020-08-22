@@ -45,11 +45,10 @@ export class Messager {
   }
 
   static logDelay(message, callObject) {
-    console.log("delayed message:", message);
     Messager.clearPending();
     pendingLog = setTimeout(() => {
       Messager.log(message, callObject);
-    }, 20);
+    }, 2000);
   }
 
   static clearPending() {

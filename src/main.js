@@ -12,14 +12,8 @@ import {
   // RenderEnvironment,
 // } from './render.js';
 
-import {
-  interpret,
-} from './interpreter.js';
-
-import {
-  Messager
-} from './messager.js';
-
+import {interpret} from './interpreter.js';
+import {Messager} from './messager.js';
 import Interpreter from './interpreter.worker.js';
 import {VertexAttributes} from './twodeejs/vertex_attributes.js';
 import {ShaderProgram} from './twodeejs/shader.js';
@@ -131,7 +125,6 @@ function stopInterpreting() {
 
 function postInterpret(pod) {
   console.log("pod:", pod);
-
 
   for (let object of pathObjects) {
     object.vertexArray.destroy();
@@ -329,7 +322,7 @@ function postInterpret(pod) {
 
 // --------------------------------------------------------------------------- 
 
-function startInterpreting(renderMode) {
+function startInterpreting(renderMode, isErrorDelayed) {
   stopInterpreting();
 
   // startSpinning(evaluateSpinner, pathifyButton);
@@ -344,13 +337,11 @@ function startInterpreting(renderMode) {
     } else if (event.data.type === 'output-delayed') {
       Messager.logDelay(event.data.payload);
     } else if (event.data.type === 'show-docs') {
-      console.log("event.data.payload:", event.data.payload);
       showDocs(event.data.payload);
     } else if (event.data.type === 'environment') {
       stopInterpreting();
       postInterpret(event.data.payload);
     } else if (event.data.type === 'error') {
-      console.log("was error");
       stopInterpreting();
     }
   });
@@ -361,9 +352,10 @@ function startInterpreting(renderMode) {
       command: 'interpret',
       source: editor.getValue(),
       renderMode,
+      isErrorDelayed,
     });
   } else {
-    const scene = interpret(editor.getValue(), Messager.log, Messager.logDelay, showDocs, renderMode);
+    const scene = interpret(editor.getValue(), Messager.log, isErrorDelayed ? Messager.logDelay : Messager.log, showDocs, renderMode);
     stopInterpreting();
     if (scene) {
       postInterpret(scene.toPod());
@@ -471,7 +463,7 @@ function onSourceChanged() {
     // scene.stale();
   // }
   // clearSelection();
-  startInterpreting(RenderMode.Pathify);
+  startInterpreting(RenderMode.Pathify, true);
   isSaved = false;
   syncTitle();
 }
@@ -511,7 +503,7 @@ function initialize() {
   resizeWindow();
 
   if (runZeroMode) {
-    startInterpreting(RenderMode.Solidify);
+    startInterpreting(RenderMode.Solidify, false);
   }
 }
 
@@ -567,11 +559,11 @@ function initializeDOM() {
   // });
 
   pathifyButton.addEventListener('click', () => {
-    startInterpreting(RenderMode.Pathify);
+    startInterpreting(RenderMode.Pathify, false);
   });
 
   solidifyButton.addEventListener('click', () => {
-    startInterpreting(RenderMode.Solidify);
+    startInterpreting(RenderMode.Solidify, false);
   });
 
   if (source0) {
