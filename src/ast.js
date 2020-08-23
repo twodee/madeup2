@@ -2416,7 +2416,7 @@ export class ExpressionSpheres extends ExpressionFunction {
     const nsides = env.variables.nsides.value;
 
     for (let vertex of polyline.vertices) {
-      const mesh = Prefab.sphere(vertex.radius, vertex.position, nsides, nsides / 2);
+      const mesh = Prefab.sphere(vertex.radius, vertex.position, nsides, Math.ceil(nsides / 2));
       env.root.addMesh(mesh);
     }
   }
