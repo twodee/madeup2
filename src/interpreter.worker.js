@@ -7,6 +7,7 @@ self.addEventListener('message', event => {
         event.data.source,
         message => self.postMessage({type: 'output', payload: message}),
         message => self.postMessage({type: event.data.isErrorDelayed ? 'output-delayed' : 'output', payload: message}),
+        () => self.postMessage({type: 'clear-error'}),
         callRecord => self.postMessage({type: 'show-docs', payload: callRecord}),
         event.data.renderMode
       );

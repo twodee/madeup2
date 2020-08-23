@@ -105,7 +105,7 @@ body {
   min-width: 300px;
 }
 
-#right > h3 {
+.panel-section > h3 {
   margin: 0;
 }
 
@@ -332,4 +332,8 @@ html.grabbing {
 }
 
 .function-docs-description {
+}
+
+.panel-section {
+  margin-bottom: 20px;
 }

@@ -336,6 +336,8 @@ function startInterpreting(renderMode, isErrorDelayed) {
       Messager.log(event.data.payload);
     } else if (event.data.type === 'output-delayed') {
       Messager.logDelay(event.data.payload);
+    } else if (event.data.type === 'clear-error') {
+      Messager.clearError();
     } else if (event.data.type === 'show-docs') {
       showDocs(event.data.payload);
     } else if (event.data.type === 'environment') {
@@ -355,7 +357,7 @@ function startInterpreting(renderMode, isErrorDelayed) {
       isErrorDelayed,
     });
   } else {
-    const scene = interpret(editor.getValue(), Messager.log, isErrorDelayed ? Messager.logDelay : Messager.log, showDocs, renderMode);
+    const scene = interpret(editor.getValue(), Messager.log, isErrorDelayed ? Messager.logDelay : Messager.log, Messager.clearError, showDocs, renderMode);
     stopInterpreting();
     if (scene) {
       postInterpret(scene.toPod());

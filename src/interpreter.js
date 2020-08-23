@@ -93,12 +93,13 @@ export class InterpreterEnvironment extends Environment {
 
 // --------------------------------------------------------------------------- 
 
-export function interpret(source, log, logError, showDocs, renderMode) {
+export function interpret(source, log, logError, clearError, showDocs, renderMode) {
   try {
     let tokens = lex(source);
     let ast = parse(tokens);
     const env = InterpreterEnvironment.create(source, log, renderMode);
     ast.evaluate(env);
+    clearError();
     return env;
   } catch (e) {
     if (e.callRecord) {

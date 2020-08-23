@@ -33,8 +33,6 @@ dowel()
       <img id="pathify-button" src="/images/pathify_icon.png" class="tool-icon">
       <img id="solidify-button" src="/images/solidify_icon.png" class="tool-icon">
       <img id="fit-button" src="/images/fit_icon.png" class="tool-icon">
-
-      <input type="button" id="save-button" value="Save">
     </div>
 
     <div id="panel-tools">
@@ -44,8 +42,16 @@ dowel()
   </div>
   <div id="middle-right-resizer" class="width-resizer resizer"></div>
   <div id="right">
-    <h3>Docs</h3>
-    <div id="docs-root"></div>
+    <div class="panel-section">
+      <h3>Docs</h3>
+      <div id="docs-root"></div>
+    </div>
+    <div class="panel-section">
+      <h3>File</h3>
+      <div id="file-root">
+        <input type="button" id="save-button" value="Save">
+      </div>
+    </div>
   </div>
 </div>
 

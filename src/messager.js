@@ -51,6 +51,10 @@ export class Messager {
     }, 2000);
   }
 
+  static clearError() {
+    clearTimeout(pendingLog);
+  }
+
   static clearPending() {
     if (pendingLog) {
       clearTimeout(pendingLog);
