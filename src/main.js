@@ -496,7 +496,7 @@ function initialize() {
     // minimum: new Vector3(0, 0, 0),
     // maximum: new Vector3(0, 0, 0),
   // };
-  camera = new Camera(new Vector3(0, 0, 0), new Vector3(0, 0, 1), new Vector3(0, 1, 0));
+  camera = new Camera(new Vector3(0, 0, 0), new Vector3(0, 0, -1), new Vector3(0, 1, 0));
   centerTransform = Matrix4.identity();
   panslation = new Vector2(0, 0);
 
@@ -831,15 +831,15 @@ function initializeCursor() {
   const positions = [
     new Vector3(-halfWidth, 0, 0),
     new Vector3(halfWidth, 0, 0),
-    new Vector3(0, -peakHeight, -peakLength),
+    new Vector3(0, peakHeight, -peakLength),
     new Vector3(0, 0, -length),
   ].map(p => p.scalarMultiply(0.1));
 
   const faces = [
-    [0, 2, 1],
-    [1, 2, 3],
-    [0, 3, 2],
-    [0, 1, 3],
+    [0, 1, 2],
+    [1, 3, 2],
+    [0, 2, 3],
+    [0, 3, 1],
   ];
 
   const mesh = new Trimesh(positions, faces);
@@ -1205,7 +1205,7 @@ function render() {
 
   const worldToEye = camera.matrix.multiplyMatrix(
     Matrix4.translate(panslation.x, panslation.y, 0)
-      .multiplyMatrix(Matrix4.translate(0, 0, zoom)
+      .multiplyMatrix(Matrix4.translate(0, 0, -zoom)
       .multiplyMatrix(trackball.rotation)
       .multiplyMatrix(centerTransform))
   );

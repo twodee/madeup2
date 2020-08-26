@@ -59,9 +59,9 @@ export const Builtins = (function() {
       new FormalParameter('nsides', sphereDocs.nsides, new ExpressionInteger(4)),
     ], new ExpressionSpheres()),
     dowel: new FunctionDefinition('dowel', '', [
-      new FormalParameter('nsides', new ExpressionInteger(4)),
-      new FormalParameter('twist', new ExpressionReal(0)),
-      new FormalParameter('round', new ExpressionReal(360)),
+      new FormalParameter('nsides', 'The number of the sides. For example, 4 yields a square dowel.', new ExpressionInteger(4)),
+      new FormalParameter('twist', 'The rotation of the dowel around its axis. In degrees.', new ExpressionReal(0)),
+      new FormalParameter('round', 'The maximum angle of the bends in the dowel. Bends greater than this value will be rounded.', new ExpressionReal(360)),
     ], new ExpressionDowel()),
     revolve: new FunctionDefinition('revolve', '', [
       new FormalParameter('degrees'),
