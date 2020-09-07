@@ -1,16 +1,20 @@
 let messagerElement;
 let messagerDocument;
 let highlight;
+let pendingLog;
 
 export class Messager {
   constructor(element, doc, onHighlight) {
     messagerElement = element;
     messagerDocument = doc;
     highlight = onHighlight;
+    pendingLog = null;
   }
 
-  static log(text) {
-    let matches = text.match(/^(-?\d+):(-?\d+):(-?\d+):(-?\d+):(.*)/);
+  static log(text, callObject) {
+    Messager.clearPending();
+
+    let matches = text.match(/^(-?\d+):(-?\d+):(-?\d+):(-?\d+):(.*)/s);
     if (matches) {
       let lineStart = parseInt(matches[1]);
       let lineEnd = parseInt(matches[2]);
@@ -27,13 +31,35 @@ export class Messager {
 
       messagerElement.appendChild(linkNode);
 
-      let textNode = messagerDocument.createTextNode(': ' + message);
-      messagerElement.appendChild(textNode);
+      // let textNode = messagerDocument.createTextNode(': ' + message);
+      // messagerElement.appendChild(textNode);
+
+      let rest = messagerDocument.createElement('span');
+      rest.innerHTML = ': ' + message;
+      messagerElement.appendChild(rest);
     } else {
       let textNode = messagerDocument.createTextNode(text);
       messagerElement.appendChild(textNode);
     }
     messagerElement.appendChild(messagerDocument.createElement('br'));
+  }
+
+  static logDelay(message, callObject) {
+    Messager.clearPending();
+    pendingLog = setTimeout(() => {
+      Messager.log(message, callObject);
+    }, 2000);
+  }
+
+  static clearError() {
+    clearTimeout(pendingLog);
+  }
+
+  static clearPending() {
+    if (pendingLog) {
+      clearTimeout(pendingLog);
+      pendingLog = null;
+    }
   }
 
   static clear() {

@@ -26,15 +26,31 @@ dowel()
       <div id="messager"></div>
     </div>
   </div>
-  <div id="left-right-resizer" class="width-resizer resizer"></div>
-  <div id="right" draggable="false">
+  <div id="left-middle-resizer" class="width-resizer resizer"></div>
+  <div id="middle" draggable="false">
     <canvas id="canvas"></canvas>
     <div id="toolbar">
       <img id="pathify-button" src="/images/pathify_icon.png" class="tool-icon">
       <img id="solidify-button" src="/images/solidify_icon.png" class="tool-icon">
       <img id="fit-button" src="/images/fit_icon.png" class="tool-icon">
+    </div>
 
-      <input type="button" id="save-button" value="Save">
+    <div id="panel-tools">
+      <img id="open-panel-button" src="/images/gear.png" class="tool-icon">
+      <img id="close-panel-button" src="/images/close.png" class="tool-icon">
+    </div>
+  </div>
+  <div id="middle-right-resizer" class="width-resizer resizer"></div>
+  <div id="right">
+    <div class="panel-section">
+      <h3>Docs</h3>
+      <div id="docs-root"></div>
+    </div>
+    <div class="panel-section">
+      <h3>File</h3>
+      <div id="file-root">
+        <input type="button" id="save-button" value="Save">
+      </div>
     </div>
   </div>
 </div>

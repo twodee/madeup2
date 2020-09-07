@@ -5,20 +5,15 @@ import './mode-madeup.js';
 import {
   MessagedException,
   RenderMode,
+  removeChildren,
 } from './common.js';
 
 // import {
   // RenderEnvironment,
 // } from './render.js';
 
-import {
-  interpret,
-} from './interpreter.js';
-
-import {
-  Messager
-} from './messager.js';
-
+import {interpret} from './interpreter.js';
+import {Messager} from './messager.js';
 import Interpreter from './interpreter.worker.js';
 import {VertexAttributes} from './twodeejs/vertex_attributes.js';
 import {ShaderProgram} from './twodeejs/shader.js';
@@ -30,6 +25,7 @@ import {Trimesh} from './twodeejs/trimesh.js';
 import {Prefab} from './twodeejs/prefab.js';
 import {Camera} from './twodeejs/camera.js';
 import {MathUtilities} from './twodeejs/mathutilities.js';
+import {Polyline} from './polyline.js';
 
 // --------------------------------------------------------------------------- 
 
@@ -72,6 +68,7 @@ let isMouseDown;
 let contentBounds;
 let near = 0.01;
 
+let cursorObject;
 let quadObject;
 let panslation;
 let mouseDownAt;
@@ -141,10 +138,36 @@ function postInterpret(pod) {
 
   pathObjects = [];
   meshObjects = [];
+  const needsFit = !contentBounds;
 
   if (pod.renderMode === RenderMode.Pathify) {
-    polylines = pod.polylines;
-    pathObjects = pod.polylines.filter(polyline => polyline.length > 0).map(polyline => generatePathObject(polyline));
+    polylines = pod.polylines.map(pod => Polyline.fromPod(pod));
+    pathObjects = polylines.filter(polyline => polyline.vertices.length > 0).map(polyline => generatePathObject(polyline.vertices));
+
+    const positions = polylines.flatMap(polyline => polyline.vertices);
+
+    if (positions.length > 0) {
+      contentBounds = {
+        minimum: new Vector3(...positions[0]),
+        maximum: new Vector3(...positions[0]),
+      };
+    } else {
+      contentBounds = {
+        minimum: new Vector3(0, 0, 0),
+        maximum: new Vector3(0, 0, 0),
+      };
+    }
+
+    for (let position of positions) {
+      for (let d = 0; d < 3; ++d) {
+        if (position[d] < contentBounds.minimum.data[d]) {
+          contentBounds.minimum.data[d] = position[d];
+        }
+        if (position[d] > contentBounds.maximum.data[d]) {
+          contentBounds.maximum.data[d] = position[d];
+        }
+      }
+    }
   } else if (pod.renderMode === RenderMode.Solidify) {
     const meshes = pod.meshes.map(pod => Trimesh.fromPod(pod));
     for (let mesh of meshes) {
@@ -184,8 +207,6 @@ function postInterpret(pod) {
       });
     }
 
-    const needsFit = !contentBounds;
-
     if (meshes.length > 0) {
       contentBounds = {
         minimum: meshes[0].bounds.minimum.clone(),
@@ -210,10 +231,10 @@ function postInterpret(pod) {
         }
       }
     }
+  }
 
-    if (needsFit) {
-      fit();
-    }
+  if (needsFit) {
+    fit();
   }
 
   render();
@@ -301,7 +322,7 @@ function postInterpret(pod) {
 
 // --------------------------------------------------------------------------- 
 
-function startInterpreting(renderMode) {
+function startInterpreting(renderMode, isErrorDelayed) {
   stopInterpreting();
 
   // startSpinning(evaluateSpinner, pathifyButton);
@@ -313,6 +334,12 @@ function startInterpreting(renderMode) {
   interpreterWorker.addEventListener('message', event => {
     if (event.data.type === 'output') {
       Messager.log(event.data.payload);
+    } else if (event.data.type === 'output-delayed') {
+      Messager.logDelay(event.data.payload);
+    } else if (event.data.type === 'clear-error') {
+      Messager.clearError();
+    } else if (event.data.type === 'show-docs') {
+      showDocs(event.data.payload);
     } else if (event.data.type === 'environment') {
       stopInterpreting();
       postInterpret(event.data.payload);
@@ -327,14 +354,106 @@ function startInterpreting(renderMode) {
       command: 'interpret',
       source: editor.getValue(),
       renderMode,
+      isErrorDelayed,
     });
   } else {
-    const scene = interpret(editor.getValue(), Messager.log, renderMode);
+    const scene = interpret(editor.getValue(), Messager.log, isErrorDelayed ? Messager.logDelay : Messager.log, Messager.clearError, showDocs, renderMode);
     stopInterpreting();
     if (scene) {
       postInterpret(scene.toPod());
     }
   }
+}
+
+// --------------------------------------------------------------------------- 
+
+function showDocs(callObject) {
+  const docsDiv = document.createElement('div');
+  docsDiv.classList.add('function-docs');
+
+  const nameDiv = document.createElement('h2');
+  nameDiv.classList.add('function-docs-heading', 'monospace');
+  nameDiv.appendChild(document.createTextNode(callObject.name));
+  docsDiv.appendChild(nameDiv);
+
+  const descriptionDiv = document.createElement('div');
+  descriptionDiv.classList.add('function-docs-description');
+  descriptionDiv.appendChild(document.createTextNode(callObject.description));
+  docsDiv.appendChild(descriptionDiv);
+
+  const parametersTitleDiv = document.createElement('h3');
+  parametersTitleDiv.classList.add('function-docs-heading');
+  parametersTitleDiv.appendChild(document.createTextNode('Parameters'));
+  docsDiv.appendChild(parametersTitleDiv);
+
+  if (callObject.parameters.length === 0) {
+    docsDiv.appendChild(document.createTextNode('None.'))
+  } else {
+    const grid = document.createElement('div');
+    grid.classList.add('function-docs-parameter-grid');
+
+    for (let parameter of callObject.parameters) {
+      // const parameterDiv = document.createElement('div');
+      // parameterDiv.classList.add('function-docs-parameter');
+
+      const div = document.createElement('div');
+      const inputElement = document.createElement('input');
+      inputElement.classList.add('function-docs-parameter-status');
+      inputElement.onclick = () => false;
+      inputElement.setAttribute('type', 'checkbox');
+      if (parameter.isProvided) {
+        inputElement.setAttribute('checked', 'checked');
+      } else if (parameter.defaultExpression) {
+        inputElement.indeterminate = true;
+      }
+      div.appendChild(inputElement);
+      grid.appendChild(div);
+
+      const nameElement = document.createElement('div');
+      nameElement.classList.add('monospace', 'function-docs-parameter-name');
+      nameElement.appendChild(document.createTextNode(`${parameter.name}`));
+      grid.appendChild(nameElement);
+
+      const descriptionElement = document.createElement('div');
+      descriptionElement.classList.add('function-docs-parameter-description');
+
+      if (parameter.description) {
+        const descriptionSpan = document.createElement('span');
+        descriptionSpan.appendChild(document.createTextNode(`${parameter.description}`));
+        descriptionElement.appendChild(descriptionSpan);
+      }
+
+      if (parameter.defaultExpression) {
+        const defaultSpan = document.createElement('span');  
+        defaultSpan.classList.add('function-docs-parameter-default');
+        defaultSpan.appendChild(document.createTextNode(' Default: '));
+        const expressionSpan = document.createElement('span');
+        expressionSpan.classList.add('monospace');
+        expressionSpan.appendChild(document.createTextNode(parameter.defaultExpression));
+        defaultSpan.appendChild(expressionSpan);
+        descriptionElement.appendChild(defaultSpan);
+      }
+
+      grid.appendChild(descriptionElement);
+    }
+
+    docsDiv.appendChild(grid);
+  }
+
+  const returnTitleDiv = document.createElement('h3');
+  returnTitleDiv.classList.add('function-docs-heading');
+  returnTitleDiv.appendChild(document.createTextNode('Returns'));
+  docsDiv.appendChild(returnTitleDiv);
+
+  if (callObject.returns) {
+    docsDiv.appendChild(document.createTextNode(callObject.returns))
+  } else {
+    docsDiv.appendChild(document.createTextNode('None.'))
+  }
+
+  const docsRoot = document.getElementById('docs-root');
+  removeChildren(docsRoot);
+  docsRoot.appendChild(docsDiv);
 }
 
 // --------------------------------------------------------------------------- 
@@ -346,6 +465,7 @@ function onSourceChanged() {
     // scene.stale();
   // }
   // clearSelection();
+  startInterpreting(RenderMode.Pathify, true);
   isSaved = false;
   syncTitle();
 }
@@ -376,7 +496,7 @@ function initialize() {
     // minimum: new Vector3(0, 0, 0),
     // maximum: new Vector3(0, 0, 0),
   // };
-  camera = new Camera(new Vector3(0, 0, 0), new Vector3(0, 0, 1), new Vector3(0, 1, 0));
+  camera = new Camera(new Vector3(0, 0, 0), new Vector3(0, 0, -1), new Vector3(0, 1, 0));
   centerTransform = Matrix4.identity();
   panslation = new Vector2(0, 0);
 
@@ -385,7 +505,7 @@ function initialize() {
   resizeWindow();
 
   if (runZeroMode) {
-    startInterpreting(RenderMode.Solidify);
+    startInterpreting(RenderMode.Solidify, false);
   }
 }
 
@@ -441,11 +561,11 @@ function initializeDOM() {
   // });
 
   pathifyButton.addEventListener('click', () => {
-    startInterpreting(RenderMode.Pathify);
+    startInterpreting(RenderMode.Pathify, false);
   });
 
   solidifyButton.addEventListener('click', () => {
-    startInterpreting(RenderMode.Solidify);
+    startInterpreting(RenderMode.Solidify, false);
   });
 
   if (source0) {
@@ -478,48 +598,183 @@ function initializeDOM() {
     };
 
     return onMouseDown;
-  }
+  };
 
-  const generateWidthResizer = resizer => {
+  const generateLeftResizer = (resizer, i) => {
     const onMouseMove = e => {
       const parentPanel = resizer.parentNode;
-      const bounds = resizer.parentNode.getBoundingClientRect();
-      const relativeX = e.clientX - bounds.x;
-      parentPanel.children[0].style['width'] = `${relativeX - 4}px`;
-      parentPanel.children[2].style['width'] = `${bounds.height - (relativeX + 4)}px`;
-      editor.resize();
+      const bounds = parentPanel.children[i - 1].getBoundingClientRect();
+      const newWidth = e.clientX - 4 - bounds.x;
 
-      localStorage.setItem('left-width', parentPanel.children[0].style.width);
+      parentPanel.children[i - 1].style['width'] = `${newWidth}px`;
+
+      editor.resize();
+      localStorage.setItem('left-width', parentPanel.children[i - 1].style.width);
       resizeWindow();
 
       e.preventDefault();
     };
 
     const onMouseDown = e => {
+      const parentPanel = resizer.parentNode;
+      const style = window.getComputedStyle(parentPanel.children[4]);
+      const originalMinWidth = style['min-width'];
+      parentPanel.children[4].style['min-width'] = style['width'];
+
       document.addEventListener('mousemove', onMouseMove);
       document.addEventListener('mouseup', () => {
+        parentPanel.children[4].style['min-width'] = originalMinWidth;
         document.removeEventListener('mousemove', onMouseMove);
       });
       e.preventDefault();
     };
 
     return onMouseDown;
-  }
+  };
+
+  const generateRightResizer = (resizer, i) => {
+    const onMouseMove = e => {
+      const parentPanel = resizer.parentNode;
+      const bounds = parentPanel.children[i + 1].getBoundingClientRect();
+
+      localStorage.setItem('right-width', parentPanel.children[i + 1].style.width);
+      resizeWindow();
+  
+      const newWidth = bounds.right - e.clientX + 4;
+      parentPanel.children[i + 1].style['width'] = `${newWidth}px`;
+
+      resizeWindow();
+      e.preventDefault();
+    };
+
+    const onMouseDown = e => {
+      const parentPanel = resizer.parentNode;
+      const style = window.getComputedStyle(parentPanel.children[0]);
+      const originalMinWidth = style['min-width'];
+      parentPanel.children[0].style['min-width'] = style['width'];
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', () => {
+        parentPanel.children[0].style['min-width'] = originalMinWidth;
+        document.removeEventListener('mousemove', onMouseMove);
+      });
+      e.preventDefault();
+    };
+
+    return onMouseDown;
+  };
 
   const editorMessagerResizer = document.getElementById('editor-messager-resizer');
   editorMessagerResizer.addEventListener('mousedown', generateHeightResizer(editorMessagerResizer)); 
 
-  const leftRightResizer = document.getElementById('left-right-resizer');
-  leftRightResizer.addEventListener('mousedown', generateWidthResizer(leftRightResizer)); 
+  const leftMiddleResizer = document.getElementById('left-middle-resizer');
+  leftMiddleResizer.addEventListener('mousedown', generateLeftResizer(leftMiddleResizer, 1)); 
 
-  // Restore editor width from last time, unless we're embedded.
-  const leftWidth0 = localStorage.getItem('left-width');
-  if (leftWidth0 && !isEmbedded) {
-    left.style['width'] = leftWidth0;
-  }
+  const middleRightResizer = document.getElementById('middle-right-resizer');
+  middleRightResizer.addEventListener('mousedown', generateRightResizer(middleRightResizer, 3));
+
+  const openPanelButton = document.getElementById('open-panel-button');
+  const closePanelButton = document.getElementById('close-panel-button');
+  const panel = document.getElementById('right');
+
+  const targetMillis = 300;
+
+  openPanelButton.addEventListener('click', () => {
+    localStorage.setItem('is-panel-open', true);
+    openPanelButton.style.display = 'none';
+
+    panel.style.display = 'block';
+    const bounds = panel.getBoundingClientRect(); 
+
+    const startValue = bounds.right;
+    const endValue = bounds.x;
+    const startMillis = new Date().getTime();
+
+    panel.style.position = 'absolute';
+    panel.style.top = '0';
+    panel.style.bottom = '0';
+
+    const animation = () => {
+      const currentMillis = new Date().getTime();
+      const elapsedMillis = currentMillis - startMillis;
+
+      if (elapsedMillis <= targetMillis) {
+        const proportion = elapsedMillis / targetMillis;
+        const value = startValue + (endValue - startValue) * proportion;
+        panel.style.left = `${value}px`;
+        requestAnimationFrame(animation);
+      } else {
+        panel.style.left = `${endValue}px`;
+        panel.style.position = 'static';
+        middleRightResizer.style.display = 'block';
+        closePanelButton.style.display = 'block';
+      }
+
+      resizeWindow();
+    };
+
+    animation();
+  });
+
+  closePanelButton.addEventListener('click', () => {
+    localStorage.setItem('is-panel-open', false);
+    closePanelButton.style.display = 'none';
+    middleRightResizer.style.display = 'none';
+
+    const bounds = panel.getBoundingClientRect(); 
+
+    const startValue = bounds.left;
+    const endValue = bounds.right;
+    const startMillis = new Date().getTime();
+
+    panel.style.position = 'absolute';
+    panel.style.top = '0';
+    panel.style.bottom = '0';
+
+    const animation = () => {
+      const currentMillis = new Date().getTime();
+      const elapsedMillis = currentMillis - startMillis;
+
+      if (elapsedMillis <= targetMillis) {
+        const proportion = elapsedMillis / targetMillis;
+        const value = startValue + (endValue - startValue) * proportion;
+        panel.style.left = `${value}px`;
+        requestAnimationFrame(animation);
+      } else {
+        panel.style.position = 'static';
+        panel.style.display = 'none';
+        openPanelButton.style.display = 'block';
+      }
+
+      resizeWindow();
+    };
+
+    animation();
+  });
 
   canvas = document.getElementById('canvas');
   window.gl = canvas.getContext('webgl2');
+
+  // Restore persisted configuration.
+  if (!isEmbedded) {
+    const leftWidth0 = localStorage.getItem('left-width');
+    if (leftWidth0) {
+      left.style['width'] = leftWidth0;
+    }
+
+    const isPanelOpen = localStorage.getItem('is-panel-open') === 'true';
+    if (isPanelOpen) {
+      right.style.display = 'block';
+      middleRightResizer.style.display = 'block';
+      closePanelButton.style.display = 'block';
+      openPanelButton.style.display = 'none';
+    }
+
+    const rightWidth0 = localStorage.getItem('right-width');
+    if (rightWidth0) {
+      right.style['width'] = rightWidth0;
+    }
+  }
 
   // Register callbacks.
   canvas.addEventListener('mousedown', mouseDown);
@@ -546,6 +801,7 @@ function initializeGL() {
   initializeSolidMeshProgram();
   initializeWireMeshProgram();
   initializePathifyNodeObject();
+  initializeCursor();
 
   const mesh = Prefab.quadrilateral(0.0041421356237309505 * 2 - 0.00001, new Vector3(0, 0, 0)); 
 
@@ -562,6 +818,44 @@ function initializeGL() {
   };
 
   reset();
+}
+
+// --------------------------------------------------------------------------- 
+
+function initializeCursor() {
+  const halfWidth = 0.5;
+  const length = 1;
+  const peakLength = 0.3;
+  const peakHeight = 0.2;
+
+  const positions = [
+    new Vector3(-halfWidth, 0, 0),
+    new Vector3(halfWidth, 0, 0),
+    new Vector3(0, peakHeight, -peakLength),
+    new Vector3(0, 0, -length),
+  ].map(p => p.scalarMultiply(0.1));
+
+  const faces = [
+    [0, 1, 2],
+    [1, 3, 2],
+    [0, 2, 3],
+    [0, 3, 1],
+  ];
+
+  const mesh = new Trimesh(positions, faces);
+  mesh.separateFaces();
+
+  const vertexAttributes = new VertexAttributes();
+  vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.getFlatPositions());
+  vertexAttributes.addAttribute('vnormal', mesh.vertexCount, 4, mesh.getFlatNormals());
+  vertexAttributes.addIndices(mesh.getFlatFaces());
+
+  const vertexArray = new VertexArray(solidMeshProgram, vertexAttributes);
+
+  cursorObject = {
+    vertexAttributes,
+    vertexArray,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -911,7 +1205,7 @@ function render() {
 
   const worldToEye = camera.matrix.multiplyMatrix(
     Matrix4.translate(panslation.x, panslation.y, 0)
-      .multiplyMatrix(Matrix4.translate(0, 0, zoom)
+      .multiplyMatrix(Matrix4.translate(0, 0, -zoom)
       .multiplyMatrix(trackball.rotation)
       .multiplyMatrix(centerTransform))
   );
@@ -924,9 +1218,11 @@ function render() {
     pathProgram.setUniform1f('halfThickness', 0.005);
     pathProgram.setUniform1f('aspectRatio', aspectRatio);
     for (let object of pathObjects) {
-      object.vertexArray.bind();
-      object.vertexArray.drawSequence(gl.TRIANGLES);
-      object.vertexArray.unbind();
+      if (object.vertexAttributes.vertexCount > 0) {
+        object.vertexArray.bind();
+        object.vertexArray.drawSequence(gl.TRIANGLES);
+        object.vertexArray.unbind();
+      }
     }
     pathProgram.unbind();
 
@@ -935,13 +1231,25 @@ function render() {
     nodeProgram.setUniformMatrix4('eyeToClip', eyeToClip);
     nodeObject.vertexArray.bind();
     for (let polyline of polylines) {
-      for (let vertex of polyline) {
+      for (let vertex of polyline.vertices) {
         nodeProgram.setUniformMatrix4('modelToEye', worldToEye.multiplyMatrix(Matrix4.translate(vertex[0], vertex[1], vertex[2])));
         nodeObject.vertexArray.drawIndexed(gl.TRIANGLES);
       }
     }
     nodeObject.vertexArray.unbind();
     nodeProgram.unbind();
+
+    solidMeshProgram.bind();
+    solidMeshProgram.setUniformMatrix4('eyeToClip', eyeToClip);
+    for (let polyline of polylines) {
+      if (polyline.vertices.length > 0) {
+        solidMeshProgram.setUniformMatrix4('modelToEye', worldToEye.multiplyMatrix(polyline.turtle.matrix.inverse()));
+        cursorObject.vertexArray.bind();
+        cursorObject.vertexArray.drawIndexed(gl.TRIANGLES);
+        cursorObject.vertexArray.unbind();
+      }
+    }
+    solidMeshProgram.unbind();
   }
 
   // Solids.

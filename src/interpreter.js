@@ -13,6 +13,8 @@ import {
 import {Environment} from './environment.js';
 import {Camera} from './twodeejs/camera.js';
 import {Vector3} from './twodeejs/vector.js';
+import {Polyline} from './polyline.js';
+import {Builtins} from './builtins.js';
 
 const seedrandom = require('seedrandom');
 
@@ -34,22 +36,6 @@ export class Random {
 
 // --------------------------------------------------------------------------- 
 
-export class Polyline {
-  constructor() {
-    this.vertices = [];
-  }
-
-  add(vertex) {
-    this.vertices.push(vertex);
-  }
-
-  toPod() {
-    return this.vertices.map(vertex => vertex.position.data);
-  }
-}
-
-// --------------------------------------------------------------------------- 
-
 export class InterpreterEnvironment extends Environment {
   initialize(log) {
     super.initialize(null);
@@ -59,10 +45,9 @@ export class InterpreterEnvironment extends Environment {
     this.log = log;
     this.root = this;
     this.polylines = [new Polyline()];
-    this.turtle = new Camera(new Vector3(0, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1));
     this.meshes = [];
 
-    this.bindGlobalFunctions();
+    this.bindGlobalFunctions(Builtins);
   }
 
   seal() {
@@ -76,9 +61,10 @@ export class InterpreterEnvironment extends Environment {
   }
 
   visit(configuration) {
-    this.polylines[this.polylines.length - 1].add({
+    const polyline = this.currentPolyline;
+    polyline.add({
       ...configuration,
-      position: this.turtle.from,
+      position: polyline.turtle.from,
     });
   }
 
@@ -107,20 +93,27 @@ export class InterpreterEnvironment extends Environment {
 
 // --------------------------------------------------------------------------- 
 
-export function interpret(source, log, renderMode) {
+export function interpret(source, log, logError, clearError, showDocs, renderMode) {
   try {
     let tokens = lex(source);
     let ast = parse(tokens);
     const env = InterpreterEnvironment.create(source, log, renderMode);
     ast.evaluate(env);
+    clearError();
     return env;
   } catch (e) {
-    if (e instanceof MessagedException) {
-      log(e.userMessage);
-    } else {
-      console.error(e);
-      log(e);
+    if (e.callRecord) {
+      showDocs(e.callRecord);
     }
+
+    if (e instanceof MessagedException) {
+      logError(e.userMessage);
+    } else {
+      logError(e);
+    }
+
+    console.error(e);
+
     return null;
   }
 }
