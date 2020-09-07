@@ -22,6 +22,7 @@ import {Matrix4} from './twodeejs/matrix.js';
 import {Trimesh} from './twodeejs/trimesh.js';
 import {Plane} from './twodeejs/plane.js';
 import {Prefab} from './twodeejs/prefab.js';
+import {MathUtilities} from './twodeejs/mathutilities.js';
 
 // --------------------------------------------------------------------------- 
 // PRIMITIVES
@@ -2204,23 +2205,43 @@ export class ExpressionDowel extends ExpressionFunction {
     const polyline = env.root.seal();
     const positions = [];
     const faces = [];
+    const vertices = polyline.vertices;
 
-    if (polyline.vertices.length < 2) {
+    if (vertices.length < 2) {
       throw new MessagedException("I expected this dowel to have at least two vertices.");
     }
 
-    let isClosed = polyline.vertices[0].position.distance(polyline.vertices[polyline.vertices.length - 1].position) < 0.00001;
+    const arePositionsCoincident = (a, b) => a.position.distance(b.position) < 0.00001;
+
+    // The dowel path is closed only if the first and last vertex have an
+    // identical position and radius.
+    let isClosed =
+      arePositionsCoincident(vertices[0], vertices[vertices.length - 1]) &&
+      MathUtilities.isClose(vertices[0].radius, vertices[vertices.length - 1].radius, 0.00001);
+
+    // To generate the first ring of vertices, we need to push perpendicularly
+    // out from the first shaft. The direction of that first shaft might not be
+    // determined by the next vertex. Find the first vertex that is away from
+    // the start.
+    let nonIncidentIndex = 1;
+    while (nonIncidentIndex < vertices.length && arePositionsCoincident(vertices[0], vertices[nonIncidentIndex])) {
+      nonIncidentIndex += 1;
+    }
+
+    if (nonIncidentIndex === vertices.length) {
+      throw new MessagedException("I expected this dowel to travel, but it doesn't.");
+    }
 
     // Seed first ring.
-    let direction = polyline.vertices[1].position.subtract(polyline.vertices[0].position).normalize();
+    let direction = vertices[nonIncidentIndex].position.subtract(vertices[0].position).normalize();
     const normal = direction.perpendicular();
-    let offset = normal.scalarMultiply(polyline.vertices[0].radius).toVector4(0);
+    let offset = normal.scalarMultiply(vertices[0].radius).toVector4(0);
     offset = Matrix4.rotate(direction, twist).multiplyVector(offset);
 
     const rotater = Matrix4.rotate(direction, 360 / nsides);
 
     for (let i = 0; i < nsides; ++i) {
-      positions.push(polyline.vertices[0].position.add(offset));
+      positions.push(vertices[0].position.add(offset));
       offset = rotater.multiplyVector(offset);
     }
 
@@ -2255,9 +2276,9 @@ export class ExpressionDowel extends ExpressionFunction {
 
     // Walk through segments.
     let markIndex = 0;
-    for (let i = 1; i < polyline.vertices.length; ++i) {
-      const radius = polyline.vertices[i].radius;
-      const distance = polyline.vertices[i].position.distance(polyline.vertices[i - 1].position);
+    for (let i = 1; i < vertices.length; ++i) {
+      const radius = vertices[i].radius;
+      const distance = vertices[i].position.distance(vertices[i - 1].position);
 
       // If this segment has no length, we take the last ring and repeat it,
       // but scaled according to this vertex's radius.
@@ -2265,7 +2286,7 @@ export class ExpressionDowel extends ExpressionFunction {
         const base = positions.length - nsides;
         for (let j = 0; j < nsides; ++j) {
           const from = positions[positions.length - nsides];
-          const to = from.subtract(polyline.vertices[markIndex].position).normalize().scalarMultiply(radius).add(polyline.vertices[markIndex].position);
+          const to = from.subtract(vertices[markIndex].position).normalize().scalarMultiply(radius).add(vertices[markIndex].position);
           positions.push(to);
           issueFace(base, j);
         }
@@ -2273,7 +2294,7 @@ export class ExpressionDowel extends ExpressionFunction {
 
       // If this is the last vertex, we run the dowel along the segment
       // direction, with the stopping plane aligned with the starting plane.
-      else if (i === polyline.vertices.length - 1) {
+      else if (i === vertices.length - 1) {
         if (isClosed) {
           const base = positions.length - nsides;
           for (let j = 0; j < nsides; ++j) {
@@ -2281,7 +2302,7 @@ export class ExpressionDowel extends ExpressionFunction {
             // faces.push([base + j % nsides, (j + 1) % nsides + nsides, j + nsides]);
           }
         } else {
-          const plane = new Plane(polyline.vertices[i].position, direction);
+          const plane = new Plane(vertices[i].position, direction);
           intersectPlane(plane, direction);
         }
       }
@@ -2291,22 +2312,22 @@ export class ExpressionDowel extends ExpressionFunction {
         // We have seen a segment that 
         markIndex = i;
 
-        const nextDistance = polyline.vertices[i + 1].position.distance(polyline.vertices[i].position);
+        const nextDistance = vertices[i + 1].position.distance(vertices[i].position);
         if (nextDistance < 0.00001) {
-          const plane = new Plane(polyline.vertices[i].position, direction);
+          const plane = new Plane(vertices[i].position, direction);
           intersectPlane(plane, direction);
         } else {
-          const nextDirection = polyline.vertices[i + 1].position.subtract(polyline.vertices[i].position).normalize();
+          const nextDirection = vertices[i + 1].position.subtract(vertices[i].position).normalize();
           const degrees = Math.acos(direction.negate().dot(nextDirection)) * 180 / Math.PI;
 
           if (degrees <= round) {
             const tangent = direction.add(nextDirection).normalize();
-            const plane = new Plane(polyline.vertices[i].position, tangent);
+            const plane = new Plane(vertices[i].position, tangent);
             intersectPlane(plane, direction);
           } else {
-            const pivot = direction.negate().add(nextDirection).normalize().scalarMultiply(radius * Math.sqrt(2)).add(polyline.vertices[i].position);
+            const pivot = direction.negate().add(nextDirection).normalize().scalarMultiply(radius * Math.sqrt(2)).add(vertices[i].position);
             const plane = new Plane(pivot, direction);
-            intersectPlaneAndRescale(plane, direction, polyline.vertices[i - 1].position, polyline.vertices[i].radius);
+            intersectPlaneAndRescale(plane, direction, vertices[i - 1].position, vertices[i].radius);
 
             const axis = direction.cross(nextDirection).normalize();
             const nsteps = Math.ceil(degrees / round);
@@ -2331,8 +2352,8 @@ export class ExpressionDowel extends ExpressionFunction {
 
     // Fill end caps.
     if (!isClosed) {
-      positions.push(polyline.vertices[0].position);
-      positions.push(polyline.vertices[polyline.vertices.length - 1].position);
+      positions.push(vertices[0].position);
+      positions.push(vertices[vertices.length - 1].position);
 
       for (let i = 0; i < nsides; ++i) {
         faces.push([positions.length - 2, (i + 1) % nsides, i]);
