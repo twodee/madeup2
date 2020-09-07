@@ -2223,8 +2223,8 @@ export class ExpressionDowel extends ExpressionFunction {
 
     // To generate the first ring of vertices, we need to push perpendicularly
     // out from the first shaft. The direction of that first shaft might not be
-    // determined by the next vertex. Find the first vertex that is away from
-    // the start.
+    // determined by the next vertex. Find the first vertex that is away
+    // forward from vertex 0.
     let nonIncidentIndex = 1;
     while (nonIncidentIndex < vertices.length && arePositionsCoincident(vertices[0], vertices[nonIncidentIndex])) {
       nonIncidentIndex += 1;
@@ -2235,16 +2235,32 @@ export class ExpressionDowel extends ExpressionFunction {
     }
 
     // Seed first ring.
-    let direction = vertices[nonIncidentIndex].position.subtract(vertices[0].position).normalize();
-    const normal = direction.perpendicular();
+    let forward = vertices[nonIncidentIndex].position.subtract(vertices[0].position).normalize();
+    const normal = forward.perpendicular();
     let offset = normal.scalarMultiply(vertices[0].radius).toVector4(0);
-    offset = Matrix4.rotate(direction, twist).multiplyVector(offset);
+    offset = Matrix4.rotate(forward, twist).multiplyVector(offset);
 
-    const rotater = Matrix4.rotate(direction, 360 / nsides);
+    const rotater = Matrix4.rotate(forward, 360 / nsides);
 
     for (let i = 0; i < nsides; ++i) {
       positions.push(vertices[0].position.add(offset));
       offset = rotater.multiplyVector(offset);
+    }
+
+    if (isClosed) {
+      nonIncidentIndex = vertices.length - 1;
+      while (nonIncidentIndex >= 0 && arePositionsCoincident(vertices[0], vertices[nonIncidentIndex])) {
+        nonIncidentIndex -= 1;
+      }
+
+      let backward = vertices[nonIncidentIndex].position.subtract(vertices[0].position).normalize();
+
+      const tangent = forward.add(backward.inverse()).normalize();
+      const plane = new Plane(vertices[0].position, tangent);
+
+      for (let i = 0; i < nsides; ++i) {
+        positions[i] = plane.intersectRay(positions[i], forward);
+      }
     }
 
     const issueFace = (base, i) => {
@@ -2252,25 +2268,25 @@ export class ExpressionDowel extends ExpressionFunction {
       faces.push([base + i % nsides, base + (i + 1) % nsides + nsides, base + i + nsides]);
     };
 
-    const intersectPlaneAndRescale = (plane, direction, fromCenter, radius) => {
+    const intersectPlaneAndRescale = (plane, forward, fromCenter, radius) => {
       const base = positions.length - nsides;
-      const toCenter = plane.intersectRay(fromCenter, direction);
+      const toCenter = plane.intersectRay(fromCenter, forward);
 
       for (let i = 0; i < nsides; ++i) {
         const from = positions[positions.length - nsides];
-        const to = plane.intersectRay(from, direction);
+        const to = plane.intersectRay(from, forward);
         const offset = to.subtract(toCenter).normalize();
         positions.push(toCenter.add(offset.scalarMultiply(radius)));
         issueFace(base, i);
       }
     }
 
-    const intersectPlane = (plane, direction) => {
+    const intersectPlane = (plane, forward) => {
       const base = positions.length - nsides;
 
       for (let i = 0; i < nsides; ++i) {
         const from = positions[positions.length - nsides];
-        const to = plane.intersectRay(from, direction);
+        const to = plane.intersectRay(from, forward);
         positions.push(to);
         issueFace(base, i);
       }
@@ -2304,8 +2320,8 @@ export class ExpressionDowel extends ExpressionFunction {
             // faces.push([base + j % nsides, (j + 1) % nsides + nsides, j + nsides]);
           }
         } else {
-          const plane = new Plane(vertices[i].position, direction);
-          intersectPlane(plane, direction);
+          const plane = new Plane(vertices[i].position, forward);
+          intersectPlane(plane, forward);
         }
       }
 
@@ -2316,22 +2332,22 @@ export class ExpressionDowel extends ExpressionFunction {
 
         const nextDistance = vertices[i + 1].position.distance(vertices[i].position);
         if (nextDistance < 0.00001) {
-          const plane = new Plane(vertices[i].position, direction);
-          intersectPlane(plane, direction);
+          const plane = new Plane(vertices[i].position, forward);
+          intersectPlane(plane, forward);
         } else {
-          const nextDirection = vertices[i + 1].position.subtract(vertices[i].position).normalize();
-          const degrees = Math.acos(direction.negate().dot(nextDirection)) * 180 / Math.PI;
+          const nextForward = vertices[i + 1].position.subtract(vertices[i].position).normalize();
+          const degrees = Math.acos(forward.negate().dot(nextForward)) * 180 / Math.PI;
 
           if (degrees <= round) {
-            const tangent = direction.add(nextDirection).normalize();
+            const tangent = forward.add(nextForward).normalize();
             const plane = new Plane(vertices[i].position, tangent);
-            intersectPlane(plane, direction);
+            intersectPlane(plane, forward);
           } else {
-            const pivot = direction.negate().add(nextDirection).normalize().scalarMultiply(radius * Math.sqrt(2)).add(vertices[i].position);
-            const plane = new Plane(pivot, direction);
-            intersectPlaneAndRescale(plane, direction, vertices[i - 1].position, vertices[i].radius);
+            const pivot = forward.negate().add(nextForward).normalize().scalarMultiply(radius * Math.sqrt(2)).add(vertices[i].position);
+            const plane = new Plane(pivot, forward);
+            intersectPlaneAndRescale(plane, forward, vertices[i - 1].position, vertices[i].radius);
 
-            const axis = direction.cross(nextDirection).normalize();
+            const axis = forward.cross(nextForward).normalize();
             const nsteps = Math.ceil(degrees / round);
             const deltaDegrees = degrees / nsteps;
 
@@ -2347,7 +2363,7 @@ export class ExpressionDowel extends ExpressionFunction {
             }
           }
 
-          direction = nextDirection;
+          forward = nextForward;
         }
       }
     }
