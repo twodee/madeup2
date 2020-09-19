@@ -2223,8 +2223,8 @@ export class ExpressionDowel extends ExpressionFunction {
 
     // To generate the first ring of vertices, we need to push perpendicularly
     // out from the first shaft. The direction of that first shaft might not be
-    // determined by the next vertex. Find the first vertex that is away
-    // forward from vertex 0.
+    // determined by the next vertex. Find the first vertex forward that is
+    // away from vertex 0.
     let nonIncidentIndex = 1;
     while (nonIncidentIndex < vertices.length && arePositionsCoincident(vertices[0], vertices[nonIncidentIndex])) {
       nonIncidentIndex += 1;
@@ -2292,7 +2292,8 @@ export class ExpressionDowel extends ExpressionFunction {
       }
     }
 
-    // Walk through segments.
+    // Walk through segments. Each segment runs from the previous vertex to the
+    // current vertex.
     let markIndex = 0;
     for (let i = 1; i < vertices.length; ++i) {
       const radius = vertices[i].radius;
@@ -2310,23 +2311,25 @@ export class ExpressionDowel extends ExpressionFunction {
         }
       }
 
-      // If this is the last vertex, we run the dowel along the segment
-      // direction, with the stopping plane aligned with the starting plane.
-      else if (i === vertices.length - 1) {
-        if (isClosed) {
-          const base = positions.length - nsides;
-          for (let j = 0; j < nsides; ++j) {
-            faces.push([base + j, (j + 1) % nsides, (j + 1) % nsides]);
-            // faces.push([base + j % nsides, (j + 1) % nsides + nsides, j + nsides]);
-          }
-        } else {
-          const plane = new Plane(vertices[i].position, forward);
-          intersectPlane(plane, forward);
+      // If this is the last vertex of a closed dowel, we connect the positions
+      // of the previous vertex to the first ring.
+      else if (i === vertices.length - 1 && isClosed) {
+        const base = positions.length - nsides;
+        for (let j = 0; j < nsides; ++j) {
+          faces.push([base + j, (j + 1) % nsides, j % nsides]);
+          faces.push([base + j, base + (j + 1) % nsides, (j + 1) % nsides]);
         }
       }
 
-      else {
+      // If this is the last vertex of an unclosed dowel, we run the dowel
+      // along the segment direction, with the stopping plane aligned with the
+      // starting plane.
+      else if (i === vertices.length - 1 && !isClosed) {
+        const plane = new Plane(vertices[i].position, forward);
+        intersectPlane(plane, forward);
+      }
 
+      else {
         // We have seen a segment that 
         markIndex = i;
 

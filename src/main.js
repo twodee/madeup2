@@ -511,6 +511,14 @@ function initialize() {
 
 // --------------------------------------------------------------------------- 
 
+function save() {
+  localStorage.setItem('src', editor.getValue());
+  isSaved = true;
+  syncTitle();
+}
+
+// --------------------------------------------------------------------------- 
+
 function initializeDOM() {
   editor = ace.edit('editor');
   editor.setTheme('ace/theme/twilight');
@@ -545,11 +553,7 @@ function initializeDOM() {
     // }
   });
 
-  saveButton.addEventListener('click', () => {
-    localStorage.setItem('src', editor.getValue());
-    isSaved = true;
-    syncTitle();
-  });
+  saveButton.addEventListener('click', save);
 
   fitButton.addEventListener('click', () => {
     fit();
@@ -780,6 +784,16 @@ function initializeDOM() {
   canvas.addEventListener('mousedown', mouseDown);
   canvas.addEventListener('mouseup', mouseUp);
   canvas.addEventListener('wheel', mouseWheel, {passive: true});
+
+  document.addEventListener('keydown', event => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+      save();
+      event.preventDefault();
+      return false;
+    } else {
+      return true;
+    }
+  });
 
   // This goes on the window rather than the canvas so that drags can keep
   // going even when the mouse goes off the canvas.
