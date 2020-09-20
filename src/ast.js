@@ -2236,6 +2236,7 @@ export class ExpressionDowel extends ExpressionFunction {
 
     // Seed first ring.
     let forward = vertices[nonIncidentIndex].position.subtract(vertices[0].position).normalize();
+    let forward0 = forward;
     const normal = forward.perpendicular();
     let offset = normal.scalarMultiply(vertices[0].radius).toVector4(0);
     offset = Matrix4.rotate(forward, twist).multiplyVector(offset);
@@ -2245,22 +2246,6 @@ export class ExpressionDowel extends ExpressionFunction {
     for (let i = 0; i < nsides; ++i) {
       positions.push(vertices[0].position.add(offset));
       offset = rotater.multiplyVector(offset);
-    }
-
-    if (isClosed) {
-      nonIncidentIndex = vertices.length - 1;
-      while (nonIncidentIndex >= 0 && arePositionsCoincident(vertices[0], vertices[nonIncidentIndex])) {
-        nonIncidentIndex -= 1;
-      }
-
-      let backward = vertices[nonIncidentIndex].position.subtract(vertices[0].position).normalize();
-
-      const tangent = forward.add(backward.inverse()).normalize();
-      const plane = new Plane(vertices[0].position, tangent);
-
-      for (let i = 0; i < nsides; ++i) {
-        positions[i] = plane.intersectRay(positions[i], forward);
-      }
     }
 
     const issueFace = (base, i) => {
@@ -2289,6 +2274,50 @@ export class ExpressionDowel extends ExpressionFunction {
         const to = plane.intersectRay(from, forward);
         positions.push(to);
         issueFace(base, i);
+      }
+    }
+
+    if (isClosed) {
+      nonIncidentIndex = vertices.length - 1;
+      while (nonIncidentIndex >= 0 && arePositionsCoincident(vertices[0], vertices[nonIncidentIndex])) {
+        nonIncidentIndex -= 1;
+      }
+
+      let backward = vertices[nonIncidentIndex].position.subtract(vertices[0].position).normalize();
+
+      const degrees = Math.acos(forward.dot(backward.inverse())) * 180 / Math.PI;
+
+      if (degrees <= round) {
+        const tangent = forward.add(backward.inverse()).normalize();
+        const plane = new Plane(vertices[0].position, tangent);
+
+        for (let i = 0; i < nsides; ++i) {
+          positions[i] = plane.intersectRay(positions[i], forward);
+        }
+      } else {
+        const pivot = forward.add(backward).normalize().scalarMultiply(vertices[0].radius * Math.sqrt(2)).add(vertices[0].position);
+        const plane = new Plane(pivot, forward);
+        const axis = forward.cross(backward).normalize();
+
+        const backRotater = Matrix4.rotateAround(axis, -degrees, pivot);
+        for (let i = 0; i < nsides; ++i) {
+          const unrotatedPosition = plane.intersectRay(positions[i], forward);
+          positions[i] = backRotater.multiplyVector(unrotatedPosition.toVector4(1)).toVector3();
+        }
+
+        const nsteps = Math.ceil(degrees / round);
+        const deltaDegrees = degrees / nsteps;
+
+        const rotater = Matrix4.rotateAround(axis, deltaDegrees, pivot);
+        for (let stepIndex = 0; stepIndex < nsteps; ++stepIndex) {
+          const base = positions.length - nsides;
+          for (let stopIndex = 0; stopIndex < nsides; ++stopIndex) {
+            const from = positions[positions.length - nsides];
+            const to = rotater.multiplyVector(positions[positions.length - nsides].toVector4(1)).toVector3();
+            positions.push(to);
+            issueFace(base, stopIndex);
+          }
+        }
       }
     }
 
@@ -2339,7 +2368,7 @@ export class ExpressionDowel extends ExpressionFunction {
           intersectPlane(plane, forward);
         } else {
           const nextForward = vertices[i + 1].position.subtract(vertices[i].position).normalize();
-          const degrees = Math.acos(forward.negate().dot(nextForward)) * 180 / Math.PI;
+          const degrees = Math.acos(forward.dot(nextForward)) * 180 / Math.PI;
 
           if (degrees <= round) {
             const tangent = forward.add(nextForward).normalize();
