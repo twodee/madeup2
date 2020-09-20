@@ -2189,8 +2189,8 @@ export class ExpressionHome extends ExpressionFunction {
     }
 
     const vertex = polyline.vertices[0];
+    env.root.currentPolyline.turtle.relocate(vertex.position);
     env.root.visit({
-      position: vertex.position,
       radius: vertex.radius,
     });
   }
