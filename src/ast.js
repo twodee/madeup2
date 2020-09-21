@@ -2428,7 +2428,7 @@ export class ExpressionRevolve extends ExpressionFunction {
     const pivot = env.variables.pivot;
 
     if (degrees < -360 || degrees > 360) {
-      throw new LocatedException(env.variables.degrees.where, 'I expected the number of degrees given to <span class="messager-code">revolve</span> to be in the interval [-360, 360].');
+      throw new LocatedException(env.variables.degrees.unevaluated.where, 'I expected the number of degrees given to <span class="messager-code">revolve</span> to be in the interval [-360, 360].');
     }
 
     const polyline = env.root.seal();

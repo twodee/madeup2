@@ -77,8 +77,9 @@ let camera;
 // --------------------------------------------------------------------------- 
 
 function highlight(lineStart, lineEnd, columnStart, columnEnd) {
-  editor.getSelection().setSelectionRange(new Range(lineStart, columnStart, lineEnd, columnEnd + 1));
-  editor.centerSelection();
+  const range = new Range(lineStart, columnStart, lineEnd, columnEnd + 1);
+  editor.getSelection().setSelectionRange(range);
+  editor.revealRange(range);
 }
 
 // --------------------------------------------------------------------------- 
