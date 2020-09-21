@@ -1066,7 +1066,9 @@ export class ExpressionFunctionCall extends Expression {
       let returnValue = f.body.evaluate(callEnvironment, this);
       return returnValue;
     } catch (e) {
-      if (e instanceof MessagedException) {
+      if (e instanceof LocatedException) {
+        throw e;
+      } else if (e instanceof MessagedException) {
         throw new LocatedException(this.where, e.message);
       } else {
         throw e;
@@ -2424,6 +2426,10 @@ export class ExpressionRevolve extends ExpressionFunction {
     const degrees = env.variables.degrees.value;
     const axis = env.variables.axis;
     const pivot = env.variables.pivot;
+
+    if (degrees < -360 || degrees > 360) {
+      throw new LocatedException(env.variables.degrees.where, 'I expected the number of degrees given to <span class="messager-code">revolve</span> to be in the interval [-360, 360].');
+    }
 
     const polyline = env.root.seal();
     const positions = [];
