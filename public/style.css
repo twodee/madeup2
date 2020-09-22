@@ -303,7 +303,8 @@ html.grabbing {
   margin-left: 0;
 }
 
-.messager-code {
+var {
+  font-style: normal;
   font-weight: bold;
   color: yellow;
 }

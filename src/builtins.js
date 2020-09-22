@@ -24,6 +24,7 @@ import {
   ExpressionMultiply,
   ExpressionPitch,
   ExpressionPolarto,
+  ExpressionPolygon,
   ExpressionPrint,
   ExpressionRandom,
   ExpressionReal,
@@ -81,6 +82,11 @@ export const Builtins = (function() {
       new FormalParameter('axis'),
       new FormalParameter('distance'),
     ], new ExpressionExtrude()),
+    polygon: new FunctionDefinition('polygon', '', [
+      // new FormalParameter('axis'),
+      // new FormalParameter('distance'),
+    ], new ExpressionPolygon()),
+
     move: new FunctionDefinition('move', '', [
       new FormalParameter('distance'),
       new FormalParameter('radius', undefined, new ExpressionReal(0.5)),

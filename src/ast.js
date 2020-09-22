@@ -1019,7 +1019,7 @@ export class ExpressionFunctionCall extends Expression {
   lookup(env) {
     let f = env.getFunction(this.nameToken.source);
     if (!f) {
-      throw new LocatedException(this.where, `I've not heard of any function named <span class="messager-code">${this.nameToken.source}</span>.`);
+      throw new LocatedException(this.where, `I've not heard of any function named <var>${this.nameToken.source}</var>.`);
     }
     return f;
   }
@@ -1045,7 +1045,7 @@ export class ExpressionFunctionCall extends Expression {
     }
 
     if (unknownParameters.length > 0) {
-      throw new LocatedException(this.where, `I didn't expect function <span class="messager-code">${this.nameToken.source}</span> to be provided a parameter named <span class="messager-code">${unknownParameters[0]}</span>. I'm not sure what to do with that parameter.\n\nPerhaps the documentation might help.`, f.toCallRecord(callEnvironment));
+      throw new LocatedException(this.where, `I didn't expect function <var>${this.nameToken.source}</var> to be provided a parameter named <var>${unknownParameters[0]}</var>. I'm not sure what to do with that parameter.\n\nPerhaps the documentation might help.`, f.toCallRecord(callEnvironment));
     }
 
     // Look for any missing formals. Supply implicit or default if possible.
@@ -1057,7 +1057,7 @@ export class ExpressionFunctionCall extends Expression {
           const value = formal.defaultThunk.evaluate(env);
           callEnvironment.bind(formal.name, value);
         } else {
-          throw new LocatedException(this.where, `I expected function <span class="messager-code">${this.nameToken.source}</span> to be provided a parameter named <span class="messager-code">${formal.name}</span>.\n\nPerhaps the documentation might help.`, f.toCallRecord(callEnvironment));
+          throw new LocatedException(this.where, `I expected function <var>${this.nameToken.source}</var> to be provided a parameter named <var>${formal.name}</var>.\n\nPerhaps the documentation might help.`, f.toCallRecord(callEnvironment));
         }
       }
     }
@@ -2428,7 +2428,7 @@ export class ExpressionRevolve extends ExpressionFunction {
     const pivot = env.variables.pivot;
 
     if (degrees < -360 || degrees > 360) {
-      throw new LocatedException(env.variables.degrees.unevaluated.where, 'I expected the number of degrees given to <span class="messager-code">revolve</span> to be in the interval [-360, 360].');
+      throw new LocatedException(env.variables.degrees.unevaluated.where, 'I expected the number of degrees given to <var>revolve</var> to be in the interval [-360, 360].');
     }
 
     const polyline = env.root.seal();
@@ -2532,6 +2532,22 @@ export class ExpressionExtrude extends ExpressionFunction {
     // faces.forEach(f => console.log(f.toString()));
 
     const mesh = new Trimesh(positions, faces);
+    env.root.addMesh(mesh);
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionPolygon extends ExpressionFunction {
+  evaluate(env) {
+    const polyline = env.root.seal();
+
+    if (polyline.vertices.length < 3) {
+      throw new MessagedException("I expected this polygon to have at least three vertices.");
+    }
+
+    const positions = polyline.vertices.slice(0, polyline.vertices.length - 1).map(vertex => vertex.position);
+    const mesh = Trimesh.triangulate(positions);
     env.root.addMesh(mesh);
   }
 }
