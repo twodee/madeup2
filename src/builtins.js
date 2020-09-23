@@ -8,6 +8,7 @@ import {
   ExpressionArcSine,
   ExpressionArcTangent,
   ExpressionArcTangent2,
+  ExpressionBoolean,
   ExpressionCubes,
   ExpressionCircle,
   ExpressionCosine,
@@ -83,8 +84,7 @@ export const Builtins = (function() {
       new FormalParameter('distance'),
     ], new ExpressionExtrude()),
     polygon: new FunctionDefinition('polygon', '', [
-      // new FormalParameter('axis'),
-      // new FormalParameter('distance'),
+      new FormalParameter('flip', 'Whether or not to flip the polygon over by reversing the order of its vertices.', new ExpressionBoolean(false)),
     ], new ExpressionPolygon()),
 
     move: new FunctionDefinition('move', '', [

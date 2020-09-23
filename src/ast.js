@@ -2519,17 +2519,11 @@ export class ExpressionExtrude extends ExpressionFunction {
 
     positions.push(...polyline.vertices.slice(0, nstops).map(vertex => vertex.position));
     positions.push(...positions.map(position => position.add(offset)));
-    // for (let vertex of polyline.vertices) {
-      // positions.push(vertex.position.add(offset));
-    // }
 
     for (let i = 0; i < nstops; ++i) {
       faces.push([i, (i + 1) % nstops, i + nstops]);
       faces.push([(i + 1) % nstops, (i + 1) % nstops + nstops, i + nstops]);
     }
-
-    // positions.forEach(p => console.log(p.toString()));
-    // faces.forEach(f => console.log(f.toString()));
 
     const mesh = new Trimesh(positions, faces);
     env.root.addMesh(mesh);
@@ -2541,13 +2535,24 @@ export class ExpressionExtrude extends ExpressionFunction {
 export class ExpressionPolygon extends ExpressionFunction {
   evaluate(env) {
     const polyline = env.root.seal();
+    const isFlipped = env.variables.flip.value;
 
-    if (polyline.vertices.length < 3) {
-      throw new MessagedException("I expected this polygon to have at least three vertices.");
+    let vertices = [...polyline.vertices];
+    if (vertices.length >= 3 && vertices[0].position.distance(vertices[vertices.length - 1].position) < 1e-6) {
+      vertices.splice(vertices.length - 1, 1);
     }
 
-    const positions = polyline.vertices.slice(0, polyline.vertices.length - 1).map(vertex => vertex.position);
+    if (vertices.length < 3) {
+      throw new MessagedException("I expected this polygon to have at least three unique vertices.");
+    }
+
+    const positions = vertices.map(vertex => vertex.position);
     const mesh = Trimesh.triangulate(positions);
+
+    if (isFlipped) {
+      mesh.reverseWinding();
+    }
+
     env.root.addMesh(mesh);
   }
 }
