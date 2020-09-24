@@ -2219,7 +2219,7 @@ export class ExpressionDowel extends ExpressionFunction {
 
     // The dowel path is closed only if the first and last vertex have an
     // identical position and radius.
-    let isClosed =
+    const isClosed =
       arePositionsCoincident(vertices[0], vertices[vertices.length - 1]) &&
       MathUtilities.isClose(vertices[0].radius, vertices[vertices.length - 1].radius, 0.00001);
 
@@ -2432,13 +2432,13 @@ export class ExpressionRevolve extends ExpressionFunction {
     }
 
     const polyline = env.root.seal();
-    const positions = [];
     const faces = [];
 
     if (polyline.vertices.length < 2) {
       throw new MessagedException("I expected this revolve to have at least two vertices.");
     }
 
+    const isCrossSectionClosed = polyline.vertices[0].position.distance(polyline.vertices[polyline.vertices.length - 1].position) < 1e-6;
     const degreesDelta = degrees / nsides;
     const isRotationClosed = Math.abs(Math.abs(degrees) - 360) < 0.00001;
 
@@ -2446,22 +2446,51 @@ export class ExpressionRevolve extends ExpressionFunction {
     const pivot3 = new Vector3(pivot.value[0].value, pivot.value[1].value, pivot.value[2].value);
     const rotater = Matrix4.rotateAround(axis3, degreesDelta, pivot3);
 
-    const nstops = isRotationClosed ? nsides : nsides + 1;
+    const ringCount = isRotationClosed ? nsides : nsides + 1;
 
-    for (let i = 0; i < polyline.vertices.length; ++i) {
-      let position = polyline.vertices[i].position;
-      for (let stopIndex = 0; stopIndex < nstops; ++stopIndex) {
-        positions.push(position);
+    let vertices = [...polyline.vertices];
+    if (isCrossSectionClosed) {
+      vertices.splice(vertices.length - 1, 1);
+    }
+
+    const positions = new Array(vertices.length * ringCount);
+    for (let i = 0; i < vertices.length; ++i) {
+      let position = vertices[i].position;
+      for (let ringIndex = 0; ringIndex < ringCount; ++ringIndex) {
+        positions[ringIndex * vertices.length + i] = position;
         position = rotater.multiplyVector(position.toVector4(1)).toVector3();
       }
     }
 
-    for (let i = 0; i < polyline.vertices.length - 1; ++i) {
-      const base = i * nstops;
-      for (let stopIndex = 0; stopIndex < nsides; ++stopIndex) {
-        faces.push([base + stopIndex, base + (stopIndex + 1) % nstops, base + stopIndex + nstops]);
-        faces.push([base + (stopIndex + 1) % nstops, base + (stopIndex + 1) % nstops + nstops, base + stopIndex + nstops]);
+    const vertexCount = isCrossSectionClosed ? vertices.length : vertices.length - 1;
+
+    const lastRingIndex = isRotationClosed ? ringCount - 1 : ringCount - 2;
+    for (let ringIndex = 0; ringIndex <= lastRingIndex; ++ringIndex) {
+      const base = ringIndex * vertices.length;
+      for (let i = 0; i < vertexCount; ++i) {
+        faces.push([
+          base + i,
+          base + (i + 1) % vertices.length,
+          (base + i + vertices.length) % positions.length,
+        ]);
+        faces.push([
+          base + (i + 1) % vertices.length,
+          (base + (i + 1) % vertices.length + vertices.length) % positions.length,
+          (base + i + vertices.length) % positions.length,
+        ]);
       }
+    }
+
+    // If the cross section is closed, then we add caps.
+    if (!isRotationClosed && isCrossSectionClosed) {
+      // const baseCap = Trimesh.triangulate(positions.slice(0, positions.length / 2));
+      // const offsetCap = Trimesh.triangulate(positions.slice(positions.length / 2));
+
+      // faces.push(...baseCap.faces.map(face => face.map(i => i + positions.length)));
+      // positions.push(...baseCap.positions);
+
+      // faces.push(...offsetCap.faces.map(face => face.map(i => i + positions.length)));
+      // positions.push(...offsetCap.positions);
     }
 
     const mesh = new Trimesh(positions, faces);
@@ -2504,25 +2533,42 @@ export class ExpressionExtrude extends ExpressionFunction {
     const distance = env.variables.distance.value;
     const polyline = env.root.seal();
 
-    if (polyline.vertices.length < 3) {
-      throw new MessagedException("I expected this extrude to have at least three vertices.");
+    if (polyline.vertices.length < 2) {
+      throw new MessagedException("I expected this extrude to have at least 2 vertices.");
     }
 
-    let isClosed = polyline.vertices[0].position.distance(polyline.vertices[polyline.vertices.length - 1].position) < 0.00001;
+    const isClosed = polyline.vertices[0].position.distance(polyline.vertices[polyline.vertices.length - 1].position) < 1e-6;
 
-    const nstops = isClosed ? polyline.vertices.length - 1 : polyline.vertices.length;
+    let vertices = [...polyline.vertices];
+    if (vertices[0].position.distance(vertices[vertices.length - 1].position) < 1e-6) {
+      vertices.splice(vertices.length - 1, 1);
+    }
+
+    const n = vertices.length;
     const positions = [];
     const faces = [];
 
     const axis3 = new Vector3(axis.value[0].value, axis.value[1].value, axis.value[2].value);
     const offset = axis3.normalize().scalarMultiply(distance);
 
-    positions.push(...polyline.vertices.slice(0, nstops).map(vertex => vertex.position));
+    positions.push(...polyline.vertices.slice(0, vertices.length).map(vertex => vertex.position));
     positions.push(...positions.map(position => position.add(offset)));
 
-    for (let i = 0; i < nstops; ++i) {
-      faces.push([i, (i + 1) % nstops, i + nstops]);
-      faces.push([(i + 1) % nstops, (i + 1) % nstops + nstops, i + nstops]);
+    for (let i = 0; i < n; ++i) {
+      faces.push([i, (i + 1) % n, i + n]);
+      faces.push([(i + 1) % n, (i + 1) % n + n, i + n]);
+    }
+
+    // If the cross section is closed, then we add caps.
+    if (isClosed) {
+      const baseCap = Trimesh.triangulate(positions.slice(0, positions.length / 2));
+      const offsetCap = Trimesh.triangulate(positions.slice(positions.length / 2));
+
+      faces.push(...baseCap.faces.map(face => face.map(i => i + positions.length)));
+      positions.push(...baseCap.positions);
+
+      faces.push(...offsetCap.faces.map(face => face.map(i => i + positions.length)));
+      positions.push(...offsetCap.positions);
     }
 
     const mesh = new Trimesh(positions, faces);
