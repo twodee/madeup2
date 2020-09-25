@@ -2429,9 +2429,9 @@ export class ExpressionRevolve extends ExpressionFunction {
     const pivot = env.variables.pivot;
     console.log("degrees:", degrees);
 
-    // if (degrees < -360 || degrees > 360) {
-      // throw new LocatedException(env.variables.degrees.unevaluated.where, 'I expected the number of degrees given to <var>revolve</var> to be in the interval [-360, 360].');
-    // }
+    if (degrees < -360 || degrees > 360) {
+      throw new LocatedException(env.variables.degrees.unevaluated.where, 'I expected the number of degrees given to <var>revolve</var> to be in the interval [-360, 360].');
+    }
 
     const polyline = env.root.seal();
     const faces = [];
@@ -2442,14 +2442,12 @@ export class ExpressionRevolve extends ExpressionFunction {
 
     const isCrossSectionClosed = polyline.vertices[0].position.distance(polyline.vertices[polyline.vertices.length - 1].position) < 1e-6;
     const degreesDelta = degrees / nsides;
-    const isRotationClosed = Math.abs(Math.abs(degrees) - 360) < 0.00001;
 
-    const axis3 = new Vector3(axis.value[0].value, axis.value[1].value, axis.value[2].value);
+    const axis3 = new Vector3(axis.value[0].value, axis.value[1].value, axis.value[2].value).normalize();
     const pivot3 = new Vector3(pivot.value[0].value, pivot.value[1].value, pivot.value[2].value);
     const rotater = Matrix4.rotateAround(axis3, degreesDelta, pivot3);
-
+    const isRotationClosed = Math.abs(Math.abs(degrees) - 360) < 1e-6;
     const ringCount = isRotationClosed ? nsides : nsides + 1;
-    console.log("ringCount:", ringCount);
 
     let vertices = polyline.vertices.map(vertex => vertex.position);
     if (isCrossSectionClosed) {

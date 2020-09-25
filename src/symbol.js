@@ -10,30 +10,14 @@ export const Symbol = Object.freeze({
   ':clockwise': new ExpressionInteger(0),
   ':counterclockwise': new ExpressionInteger(1),
 
-  // for alignment-baseline on text elements
-  // See https://vanseodesign.com/web-design/svg-text-baseline-alignment for semantics.
-  ':top': new ExpressionString('hanging'),
-  ':center': new ExpressionString('center'),
-  ':central': new ExpressionString('central'),
-  ':bottom': new ExpressionString('baseline'),
-
-  // Text anchors.
-  ':start': new ExpressionString('start'),
-  ':middle': new ExpressionString('middle'),
-  ':end': new ExpressionString('end'),
-
-  ':short': new ExpressionInteger(0),
-  ':long': new ExpressionInteger(1),
-
-  ':round': new ExpressionString('round'),
-  ':miter': new ExpressionString('miter'),
-  ':bevel': new ExpressionString('bevel'),
-
   // Vectors
-  ':zero2': new ExpressionVector([new ExpressionReal(0), new ExpressionReal(0)]),
-  ':zero3': new ExpressionVector([new ExpressionReal(0), new ExpressionReal(0), new ExpressionReal(0)]),
-  ':up': new ExpressionVector([new ExpressionReal(0), new ExpressionReal(1)]),
-  ':right': new ExpressionVector([new ExpressionReal(1), new ExpressionReal(0)]),
+  ':zero': new ExpressionVector([new ExpressionReal(0), new ExpressionReal(0), new ExpressionReal(0)]),
+  ':up': new ExpressionVector([new ExpressionReal(0), new ExpressionReal(1), new ExpressionReal(0)]),
+  ':down': new ExpressionVector([new ExpressionReal(0), new ExpressionReal(-1), new ExpressionReal(0)]),
+  ':right': new ExpressionVector([new ExpressionReal(1), new ExpressionReal(0), new ExpressionReal(0)]),
+  ':left': new ExpressionVector([new ExpressionReal(-1), new ExpressionReal(0), new ExpressionReal(0)]),
+  ':forward': new ExpressionVector([new ExpressionReal(0), new ExpressionReal(0), new ExpressionReal(-1)]),
+  ':backward': new ExpressionVector([new ExpressionReal(0), new ExpressionReal(0), new ExpressionReal(1)]),
 
   // Interpolants
   ':linear': new ExpressionString('interpolateLinear'),
@@ -58,9 +42,6 @@ export const Symbol = Object.freeze({
   ':magenta': new ExpressionVector([new ExpressionReal(1), new ExpressionReal(0), new ExpressionReal(1)]),
   ':cornflower': new ExpressionVector([new ExpressionReal(0.392), new ExpressionReal(0.584), new ExpressionReal(0.929)]),
   ':crimson': new ExpressionVector([new ExpressionReal(0.863), new ExpressionReal(0.078), new ExpressionReal(0.235)]),
-
-  ':absolute': new ExpressionInteger(0),
-  ':relative': new ExpressionInteger(1),
 
   // Polygon
   ':open': new ExpressionInteger(0),

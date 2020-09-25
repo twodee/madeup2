@@ -321,7 +321,7 @@ export function parse(tokens) {
         e.where = token.where;
         return e;
       } else {
-        throw new LocatedException(token.where, `I don't recognize the symbol "${token.source}".`);
+        throw new LocatedException(token.where, `I don't recognize the symbol <var>${token.source}</var>.`);
       }
     } else if (has(TokenType.String)) {
       let token = consume();

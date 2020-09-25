@@ -82,6 +82,11 @@ var MadeupHighlightRules = function() {
         next: "start"
       },
       {
+        token: "constant.language",
+        regex: /:[A-Za-z][-A-Za-z0-9]*/,
+        next: "start"
+      },
+      {
         token: "range",
         regex: /\.\./,
         next: "start"

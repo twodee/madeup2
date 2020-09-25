@@ -1323,7 +1323,7 @@ function updateProjection() {
     // eyeToClip = Matrix4.ortho(-1, 1, -1 / aspectRatio, 1 / aspectRatio);
   // }
 
-  eyeToClip = Matrix4.fovPerspective(45, aspectRatio, 0.01, 100);
+  eyeToClip = Matrix4.fovPerspective(45, aspectRatio, 0.01, 1000);
 
   // eyeToClip = Matrix4.fovPerspective(45, 1, near, 10);
 
