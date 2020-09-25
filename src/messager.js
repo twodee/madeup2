@@ -14,6 +14,7 @@ export class Messager {
   static log(text, callObject) {
     Messager.clearPending();
 
+    console.error(text);
     let matches = text.match(/^(-?\d+):(-?\d+):(-?\d+):(-?\d+):(.*)/s);
     if (matches) {
       let lineStart = parseInt(matches[1]);

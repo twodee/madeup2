@@ -2427,10 +2427,11 @@ export class ExpressionRevolve extends ExpressionFunction {
     const degrees = env.variables.degrees.value;
     const axis = env.variables.axis;
     const pivot = env.variables.pivot;
+    console.log("degrees:", degrees);
 
-    if (degrees < -360 || degrees > 360) {
-      throw new LocatedException(env.variables.degrees.unevaluated.where, 'I expected the number of degrees given to <var>revolve</var> to be in the interval [-360, 360].');
-    }
+    // if (degrees < -360 || degrees > 360) {
+      // throw new LocatedException(env.variables.degrees.unevaluated.where, 'I expected the number of degrees given to <var>revolve</var> to be in the interval [-360, 360].');
+    // }
 
     const polyline = env.root.seal();
     const faces = [];
@@ -2448,15 +2449,31 @@ export class ExpressionRevolve extends ExpressionFunction {
     const rotater = Matrix4.rotateAround(axis3, degreesDelta, pivot3);
 
     const ringCount = isRotationClosed ? nsides : nsides + 1;
+    console.log("ringCount:", ringCount);
 
-    let vertices = [...polyline.vertices];
+    let vertices = polyline.vertices.map(vertex => vertex.position);
     if (isCrossSectionClosed) {
       vertices.splice(vertices.length - 1, 1);
     }
 
+    let delta = new Vector3(0, 0, 0);
+    for (let i = 0; delta.magnitude < 1e-6 && i < vertices.length; ++i) {
+      const rrr = Matrix4.rotate(axis3, degrees < 0 ? -10 : 10, pivot3);
+      const rotatedPosition = rrr.multiplyVector(vertices[i].toVector4(1)).toVector3();
+      delta = rotatedPosition.subtract(vertices[i]);
+    }
+
+    const isCounterClockwise = Polyline.isCounterClockwise(Polyline.flatten(vertices));
+    const normal = Polyline.normal(vertices);
+    const normalDotDirection = normal.dot(delta);
+
+    if (normalDotDirection < 0) {
+      vertices.reverse();
+    }
+
     const positions = new Array(vertices.length * ringCount);
     for (let i = 0; i < vertices.length; ++i) {
-      let position = vertices[i].position;
+      let position = vertices[i];
       for (let ringIndex = 0; ringIndex < ringCount; ++ringIndex) {
         positions[ringIndex * vertices.length + i] = position;
         position = rotater.multiplyVector(position.toVector4(1)).toVector3();
@@ -2486,6 +2503,8 @@ export class ExpressionRevolve extends ExpressionFunction {
     // we add caps.
     if (!isRotationClosed && isCrossSectionClosed) {
       const baseCap = Trimesh.triangulate(positions.slice(0, vertices.length));
+      baseCap.reverseWinding();
+
       const offsetCap = Trimesh.triangulate(positions.slice(positions.length - vertices.length));
 
       faces.push(...baseCap.faces.map(face => face.map(i => i + positions.length)));
