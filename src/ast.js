@@ -13,6 +13,7 @@ import {
   SourceLocation,
 } from './token.js';
 
+import {Polyline} from './twodeejs/polyline.js';
 import {Vector3} from './twodeejs/vector.js';
 import {Matrix4} from './twodeejs/matrix.js';
 import {Trimesh} from './twodeejs/trimesh.js';
@@ -2481,16 +2482,17 @@ export class ExpressionRevolve extends ExpressionFunction {
       }
     }
 
-    // If the cross section is closed, then we add caps.
+    // Only if the cross section is closed but the revolution is incomplete do
+    // we add caps.
     if (!isRotationClosed && isCrossSectionClosed) {
-      // const baseCap = Trimesh.triangulate(positions.slice(0, positions.length / 2));
-      // const offsetCap = Trimesh.triangulate(positions.slice(positions.length / 2));
+      const baseCap = Trimesh.triangulate(positions.slice(0, vertices.length));
+      const offsetCap = Trimesh.triangulate(positions.slice(positions.length - vertices.length));
 
-      // faces.push(...baseCap.faces.map(face => face.map(i => i + positions.length)));
-      // positions.push(...baseCap.positions);
+      faces.push(...baseCap.faces.map(face => face.map(i => i + positions.length)));
+      positions.push(...baseCap.positions);
 
-      // faces.push(...offsetCap.faces.map(face => face.map(i => i + positions.length)));
-      // positions.push(...offsetCap.positions);
+      faces.push(...offsetCap.faces.map(face => face.map(i => i + positions.length)));
+      positions.push(...offsetCap.positions);
     }
 
     const mesh = new Trimesh(positions, faces);
@@ -2551,7 +2553,12 @@ export class ExpressionExtrude extends ExpressionFunction {
     const axis3 = new Vector3(axis.value[0].value, axis.value[1].value, axis.value[2].value);
     const offset = axis3.normalize().scalarMultiply(distance);
 
-    positions.push(...polyline.vertices.slice(0, vertices.length).map(vertex => vertex.position));
+    positions.push(...vertices.map(vertex => vertex.position));
+
+    const normal = Polyline.normal(positions);
+    const normalDotAxis = normal.dot(offset);
+    const isCounterClockwise = Polyline.isCounterClockwise(Polyline.flatten(positions));
+
     positions.push(...positions.map(position => position.add(offset)));
 
     for (let i = 0; i < n; ++i) {
@@ -2559,10 +2566,25 @@ export class ExpressionExtrude extends ExpressionFunction {
       faces.push([(i + 1) % n, (i + 1) % n + n, i + n]);
     }
 
+    if (normalDotAxis < 0) {
+      for (let face of faces) {
+        const tmp = face[1];
+        face[1] = face[2];
+        face[2] = tmp;
+      }
+    }
+
     // If the cross section is closed, then we add caps.
     if (isClosed) {
       const baseCap = Trimesh.triangulate(positions.slice(0, positions.length / 2));
+      if ((isCounterClockwise && normalDotAxis > 0) || (!isCounterClockwise && normalDotAxis < 0)) {
+        baseCap.reverseWinding();
+      }
+
       const offsetCap = Trimesh.triangulate(positions.slice(positions.length / 2));
+      if ((isCounterClockwise && normalDotAxis < 0) || (!isCounterClockwise && normalDotAxis > 0)) {
+        offsetCap.reverseWinding();
+      }
 
       faces.push(...baseCap.faces.map(face => face.map(i => i + positions.length)));
       positions.push(...baseCap.positions);
