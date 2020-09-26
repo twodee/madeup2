@@ -20,6 +20,7 @@ import {
   ExpressionInt,
   ExpressionInteger,
   ExpressionDowel,
+  ExpressionMesh,
   ExpressionMoveto,
   ExpressionMove,
   ExpressionMultiply,
@@ -83,6 +84,12 @@ export const Builtins = (function() {
       new FormalParameter('axis'),
       new FormalParameter('distance'),
     ], new ExpressionExtrude()),
+
+    mesh: new FunctionDefinition('mesh', '', [
+      new FormalParameter('vertices'),
+      new FormalParameter('faces'),
+    ], new ExpressionMesh()),
+
     polygon: new FunctionDefinition('polygon', '', [
       new FormalParameter('flip', 'Whether or not to flip the polygon over by reversing the order of its vertices.', new ExpressionBoolean(false)),
     ], new ExpressionPolygon()),

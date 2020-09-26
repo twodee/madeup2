@@ -2644,3 +2644,27 @@ export class ExpressionPolygon extends ExpressionFunction {
 
 // --------------------------------------------------------------------------- 
 
+export class ExpressionMesh extends ExpressionFunction {
+  evaluate(env) {
+    // const polyline = env.root.seal();
+
+    const verticesList = env.variables.vertices.value;
+    const facesList = env.variables.faces.value;
+
+    // TODO check types
+
+    const positions = verticesList.map(vertexList => {
+      return new Vector3(vertexList.get(0).value, vertexList.get(1).value, vertexList.get(2).value);
+    });
+
+    const faces = facesList.map(faceList => {
+      return [faceList.get(0).value, faceList.get(1).value, faceList.get(2).value];
+    });
+
+    const mesh = new Trimesh(positions, faces);
+    env.root.addMesh(mesh);
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
