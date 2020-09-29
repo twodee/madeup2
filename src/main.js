@@ -37,7 +37,7 @@ let pathifyButton;
 let solidifyButton;
 let fitButton;
 let saveButton;
-// let stopButton;
+let stopButton;
 let interpreterWorker;
 // let evaluateSpinner;
 let canvas;
@@ -54,7 +54,7 @@ let pathProgram;
 let solidMeshProgram;
 let wireMeshProgram;
 
-let isWireframe = false;
+let isWireframe = true;
 
 let eyeToClip;
 let modelToEye;
@@ -118,8 +118,7 @@ function stopInterpreting() {
     interpreterWorker.terminate();
     interpreterWorker = undefined;
   }
-  // stopButton.classList.add('hidden');
-  // stopSpinning(evaluateSpinner, pathifyButton);
+  stopButton.classList.add('hidden');
 }
 
 // --------------------------------------------------------------------------- 
@@ -325,9 +324,7 @@ function postInterpret(pod) {
 
 function startInterpreting(renderMode, isErrorDelayed) {
   stopInterpreting();
-
-  // startSpinning(evaluateSpinner, pathifyButton);
-  // stopButton.classList.remove('hidden');
+  stopButton.classList.remove('hidden');
 
   Messager.clear();
 
@@ -537,7 +534,7 @@ function initializeDOM() {
   solidifyButton = document.getElementById('solidify-button');
   fitButton = document.getElementById('fit-button');
   saveButton = document.getElementById('save-button');
-  // stopButton = document.getElementById('stop-button');
+  stopButton = document.getElementById('stop-button');
   // evaluateSpinner = document.getElementById('evaluate-spinner');
 
   new Messager(document.getElementById('messager'), document, highlight);
@@ -561,9 +558,9 @@ function initializeDOM() {
     render();
   });
 
-  // stopButton.addEventListener('click', e => {
-    // stopInterpreting();
-  // });
+  stopButton.addEventListener('click', e => {
+    stopInterpreting();
+  });
 
   pathifyButton.addEventListener('click', () => {
     startInterpreting(RenderMode.Pathify, false);
@@ -1054,7 +1051,8 @@ void main() {
 precision mediump float;
 
 const vec3 lightPositionEye = vec3(1.0, 1.0, 1.0);
-const vec3 albedo = vec3(1.0, 0.5, 0.0);
+// const vec3 albedo = vec3(0.478, 0.478, 0.478);
+const vec3 albedo = vec3(1, 0.5, 0);
 const vec3 flippedAlbedo = vec3(0.0, 0.5, 1.0);
 
 in vec3 positionEye;
@@ -1213,6 +1211,7 @@ function fit() {
 
 function render() {
   gl.clearColor(0.9, 0.9, 0.9, 1);
+  // gl.clearColor(1, 1, 1, 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 

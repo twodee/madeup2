@@ -36,6 +36,7 @@ import {
   ExpressionSine,
   ExpressionSpheres,
   ExpressionSquareRoot,
+  ExpressionStay,
   ExpressionString,
   ExpressionSubtract,
   ExpressionTangent,
@@ -98,6 +99,10 @@ export const Builtins = (function() {
       new FormalParameter('distance'),
       new FormalParameter('radius', undefined, new ExpressionReal(0.5)),
     ], new ExpressionMove()),
+    stay: new FunctionDefinition('stay', '', [
+      new FormalParameter('radius', undefined, new ExpressionReal(0.5)),
+    ], new ExpressionStay()),
+
     yaw: new FunctionDefinition('yaw', '', [
       new FormalParameter('degrees'),
     ], new ExpressionYaw()),
