@@ -2386,17 +2386,23 @@ export class ExpressionDowel extends ExpressionFunction {
 
       else {
         const from = stops[(i + 1) % stops.length].position.subtract(stops[i].position).normalize();
-        console.log("from", from.toString());
         const degrees = Math.acos(from.dot(to)) * 180 / Math.PI;
-        console.log("degrees:", degrees);
 
         if (degrees <= round || stops[i].radii.length > 1) {
-          console.log("miter");
+          // Cast rays from the preceding ring into a perpendicular plane.
+          const perpendicularPlane = new Plane(stops[i].position, to);
+          const vertexZeroIndex = positions.length - nsides;
+          for (let radius of stops[i].radii) {
+            intersectPlaneAndRescale(perpendicularPlane, to, stops[i - 1].position, radius, vertexZeroIndex);
+          }
+
+          const tangent = to.add(from).normalize();
+          const miterPlane = new Plane(stops[i].position, tangent);
+          for (let i = vertexZeroIndex + nsides; i < positions.length; ++i) {
+            positions[i] = miterPlane.intersectRay(positions[i], to);
+          }
         } else {
-          // console.log("round");
-          // console.log("long", to.inverse().add(from).normalize().toString());
           const pivot = to.inverse().add(from).normalize().scalarMultiply(stops[i].radii[0] * Math.sqrt(2)).add(stops[i].position);
-          // console.log("pivot:", pivot.toString());
           const plane = new Plane(pivot, to);
           intersectPlaneAndRescale(plane, to, stops[i - 1].position, stops[i].radii[0], positions.length - nsides);
 
@@ -2427,8 +2433,17 @@ export class ExpressionDowel extends ExpressionFunction {
       }
     }
 
-    console.log("positions:", positions);
-    console.log("faces:", faces);
+    // console.log("positions:", positions);
+    // console.log("faces:", faces);
+
+    if (!isCircuit) {
+      positions.push(stops[0].position);
+      positions.push(stops[stops.length - 1].position);
+      for (let i = 0; i < nsides; ++i) {
+        faces.push([positions.length - 2, (i + 1) % nsides, i]);
+        faces.push([positions.length - 1, positions.length - 2 - nsides + i, positions.length - 2 - nsides + (i + 1) % nsides]);
+      }
+    }
 
     const mesh = new Trimesh(positions, faces);
     env.root.addMesh(mesh);

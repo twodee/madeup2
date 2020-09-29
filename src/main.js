@@ -54,7 +54,7 @@ let pathProgram;
 let solidMeshProgram;
 let wireMeshProgram;
 
-let isWireframe = true;
+let isWireframe = false;
 
 let eyeToClip;
 let modelToEye;
