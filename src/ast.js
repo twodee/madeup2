@@ -2237,6 +2237,37 @@ export class ExpressionDowel extends ExpressionFunction {
       faces.push([base + i % nsides, base + (i + 1) % nsides + nsides, base + i + nsides]);
     };
 
+    const intersectPlane = (plane, forward) => {
+      const base = positions.length - nsides;
+
+      for (let i = 0; i < nsides; ++i) {
+        const from = positions[positions.length - nsides];
+        const to = plane.intersectRay(from, forward);
+        positions.push(to);
+        issueFace(base, i);
+      }
+    }
+
+    const intersectPlaneAndRescale = (plane, forward, fromCenter, radius, base) => {
+      const toCenter = plane.intersectRay(fromCenter, forward);
+      const vertexZeroIndex = positions.length - nsides;
+      for (let i = 0; i < nsides; ++i) {
+        const from = positions[base + i];
+        // console.log("from.toString():", from.toString());
+        // console.log("forward.toString():", forward.toString());
+        // console.log("plane.normal.toString():", plane.normal.toString());
+        // console.log("plane.point.toString():", plane.point.toString());
+        const to = plane.intersectRay(from, forward);
+        // console.log("to:", to);
+        // console.log("to.toString():", to.toString());
+        // console.log("toCenter.toString():", toCenter.toString());
+        const offset = to.subtract(toCenter).normalize();
+        // console.log("radius:", radius);
+        positions.push(toCenter.add(offset.scalarMultiply(radius)));
+        issueFace(vertexZeroIndex, i);
+      }
+    }
+
     // Bundle all the coincident stops together to make traversal simpler. Each
     // stop will be physically separate from its predecessor and successor. Any
     // stays will be represented in the array of radii.
@@ -2262,12 +2293,12 @@ export class ExpressionDowel extends ExpressionFunction {
 
     // The dowel path is closed only if the first and last vertex have an
     // identical position and radius.
-    const isClosed =
+    const isCircuit =
       arePositionsCoincident(vertices[0], vertices[vertices.length - 1]) &&
       MathUtilities.isClose(vertices[0].radius, vertices[vertices.length - 1].radius, 1e-6);
 
     // Migrate any coincident stays at the end of the dowel to the beginning.
-    if (isClosed && stops.length > 1 && arePositionsCoincident(stops[0], stops[stops.length - 1])) {
+    if (isCircuit && stops.length > 1 && arePositionsCoincident(stops[0], stops[stops.length - 1])) {
       const {radii} = stops.pop();
       stops[0].radii = [...radii.slice(0, radii.length - 1), ...stops[0].radii];
     }
@@ -2295,7 +2326,10 @@ export class ExpressionDowel extends ExpressionFunction {
       }
     }
 
-    if (isClosed) {
+    // If the dowel is a closed circuit, then we need to project the positions
+    // back onto a miter plane that bisects the angle between the last and
+    // first segments or round off the bend.
+    if (isCircuit) {
       const backward = stops[stops.length - 1].position.subtract(stops[0].position).normalize();
       const degrees = Math.acos(forward.dot(backward.inverse())) * 180 / Math.PI;
 
@@ -2317,11 +2351,11 @@ export class ExpressionDowel extends ExpressionFunction {
           positions[i] = backRotater.multiplyVector(unrotatedPosition.toVector4(1)).toVector3();
         }
 
-        const nsteps = Math.ceil(degrees / round);
-        const deltaDegrees = degrees / nsteps;
+        const nwedges = Math.ceil(degrees / round);
+        const deltaDegrees = degrees / nwedges;
 
         const rotater = Matrix4.rotateAround(axis, deltaDegrees, pivot);
-        for (let stepIndex = 0; stepIndex < nsteps; ++stepIndex) {
+        for (let wedgeIndex = 0; wedgeIndex < nwedges; ++wedgeIndex) {
           const base = positions.length - nsides;
           for (let stopIndex = 0; stopIndex < nsides; ++stopIndex) {
             const from = positions[positions.length - nsides];
@@ -2332,6 +2366,69 @@ export class ExpressionDowel extends ExpressionFunction {
         }
       }
     }
+
+    for (let i = 1; i < stops.length; ++i) {
+      const to = stops[i].position.subtract(stops[i - 1].position);
+      console.log("to:", to.toString());
+      
+      // If this is the last position of a non-circuit, we intersect with a
+      // plane perpendicular to the segment.
+      if (i === stops.length - 1 && !isCircuit) {
+        const plane = new Plane(stops[i].position, to);
+        const base = positions.length - nsides;
+        // console.log("positions.length:", positions.length);
+        // console.log("base:", base);
+        intersectPlaneAndRescale(plane, to, stops[i - 1].position, stops[i].radii[0], base);
+        for (let ringIndex = 1; ringIndex < stops[i].radii.length; ++ringIndex) {
+          intersectPlaneAndRescale(plane, to, stops[i - 1].position, stops[i].radii[ringIndex], base);
+        }
+      }
+
+      else {
+        const from = stops[(i + 1) % stops.length].position.subtract(stops[i].position).normalize();
+        console.log("from", from.toString());
+        const degrees = Math.acos(from.dot(to)) * 180 / Math.PI;
+        console.log("degrees:", degrees);
+
+        if (degrees <= round || stops[i].radii.length > 1) {
+          console.log("miter");
+        } else {
+          // console.log("round");
+          // console.log("long", to.inverse().add(from).normalize().toString());
+          const pivot = to.inverse().add(from).normalize().scalarMultiply(stops[i].radii[0] * Math.sqrt(2)).add(stops[i].position);
+          // console.log("pivot:", pivot.toString());
+          const plane = new Plane(pivot, to);
+          intersectPlaneAndRescale(plane, to, stops[i - 1].position, stops[i].radii[0], positions.length - nsides);
+
+          const axis = to.cross(from).normalize();
+          // console.log("axis.toString():", axis.toString());
+          const nwedges = Math.ceil(degrees / round);
+          const deltaDegrees = degrees / nwedges;
+
+          for (let wedgeIndex = 0; wedgeIndex < nwedges; ++wedgeIndex) {
+            const base = positions.length - nsides;
+            const rotater = Matrix4.rotateAround(axis, deltaDegrees, pivot);
+            for (let radialIndex = 0; radialIndex < nsides; ++radialIndex) {
+              const from = positions[positions.length - nsides];
+              const to = rotater.multiplyVector(positions[positions.length - nsides].toVector4(1)).toVector3();
+              positions.push(to);
+              issueFace(base, radialIndex);
+            }
+          }
+        }
+      }
+    }
+
+    if (isCircuit) {
+      const base = positions.length - nsides;
+      for (let i = 0; i < nsides; ++i) {
+        faces.push([base + i, base + (i + 1) % nsides, (i + 1) % nsides]);
+        faces.push([base + i % nsides, (i + 1) % nsides, i]);
+      }
+    }
+
+    console.log("positions:", positions);
+    console.log("faces:", faces);
 
     const mesh = new Trimesh(positions, faces);
     env.root.addMesh(mesh);
@@ -2374,30 +2471,6 @@ export class ExpressionDowel extends ExpressionFunction {
       faces.push([base + i, base + (i + 1) % nsides, base + (i + 1) % nsides + nsides]);
       faces.push([base + i % nsides, base + (i + 1) % nsides + nsides, base + i + nsides]);
     };
-
-    const intersectPlaneAndRescale = (plane, forward, fromCenter, radius) => {
-      const base = positions.length - nsides;
-      const toCenter = plane.intersectRay(fromCenter, forward);
-
-      for (let i = 0; i < nsides; ++i) {
-        const from = positions[positions.length - nsides];
-        const to = plane.intersectRay(from, forward);
-        const offset = to.subtract(toCenter).normalize();
-        positions.push(toCenter.add(offset.scalarMultiply(radius)));
-        issueFace(base, i);
-      }
-    }
-
-    const intersectPlane = (plane, forward) => {
-      const base = positions.length - nsides;
-
-      for (let i = 0; i < nsides; ++i) {
-        const from = positions[positions.length - nsides];
-        const to = plane.intersectRay(from, forward);
-        positions.push(to);
-        issueFace(base, i);
-      }
-    }
 
     if (isClosed) {
       nonIncidentIndex = vertices.length - 1;
@@ -2545,9 +2618,6 @@ export class ExpressionDowel extends ExpressionFunction {
         else {
           const nextForward = vertices[i + 1].position.subtract(vertices[i].position).normalize();
           // const nextForward = vertices[nextNoncoincidents[i]].position.subtract(vertices[i].position).normalize();
-          console.log("-> vertices[", i + 0, "]:", vertices[i + 0].position.toString());
-          console.log("-> vertices[", i + 1, "]:", vertices[i + 1].position.toString());
-          console.log("nextForward:", nextForward.toString());
           const degrees = Math.acos(forward.dot(nextForward)) * 180 / Math.PI;
 
           if (degrees <= round) {
