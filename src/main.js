@@ -346,7 +346,7 @@ function startInterpreting(renderMode, isErrorDelayed) {
     }
   });
 
-  const hasWorker = false;
+  const hasWorker = true;
   if (hasWorker) {
     interpreterWorker.postMessage({
       command: 'interpret',
@@ -361,6 +361,15 @@ function startInterpreting(renderMode, isErrorDelayed) {
       postInterpret(scene.toPod());
     }
   }
+}
+
+// --------------------------------------------------------------------------- 
+
+function onChangeCursor() {
+  const cursor = editor.getCursorPosition();
+  console.log("cursor.column:", cursor.column);
+  console.log("cursor.row:", cursor.row);
+  // scene.castCursor(cursor.column, cursor.row);
 }
 
 // --------------------------------------------------------------------------- 
@@ -544,12 +553,7 @@ function initializeDOM() {
   }
   editor.getSession().on('change', onSourceChanged);
   editor.getSession().setMode("ace/mode/madeup");
-  editor.getSession().selection.on('changeCursor', () => {
-    // if (scene) {
-      // const cursor = editor.getCursorPosition();
-      // scene.castCursor(cursor.column, cursor.row);
-    // }
-  });
+  editor.getSession().selection.on('changeCursor', onChangeCursor); 
 
   saveButton.addEventListener('click', save);
 
