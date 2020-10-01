@@ -228,8 +228,6 @@ export class ExpressionInteger extends ExpressionData {
     } else if (other instanceof ExpressionReal) {
       return new ExpressionReal(this.value + other.value);
     } else if (other instanceof ExpressionString) {
-      console.log("this:", this);
-      console.log("other:", other);
       return new ExpressionString(this.toPretty() + other.toPretty());
     } else {
       throw new MessagedException('Add failed');
@@ -385,7 +383,7 @@ export class ExpressionString extends ExpressionData {
     super(value, where, unevaluated, prevalues);
 
     this.functions = {
-      size: new FunctionDefinition('size', [], new ExpressionStringSize(this)),
+      size: new FunctionDefinition('size', '', [], new ExpressionStringSize(this)),
     };
   }
 
@@ -883,7 +881,7 @@ export class ExpressionFunctionDefinition extends Expression {
   }
 
   evaluate(env) {
-    env.functions[this.name] = new FunctionDefinition(this.name, this.formals, this.body);
+    env.functions[this.name] = new FunctionDefinition(this.name, '', this.formals, this.body);
   }
 }
 
@@ -1032,6 +1030,9 @@ export class ExpressionFunctionCall extends Expression {
   evaluate(env) {
     let f = this.lookup(env);
 
+    const providedParameters = [];
+    env.root.addCall(this.where, f.documentation, providedParameters);
+
     let unknownParameters = [];
 
     let callEnvironment = Environment.create(env);
@@ -1039,6 +1040,7 @@ export class ExpressionFunctionCall extends Expression {
       if (!f.formals.find(formal => formal.name === identifier)) {
         unknownParameters.push(identifier);
       } else {
+        providedParameters.push(identifier);
         let value;
         if (actualExpression) {
           value = actualExpression.evaluate(env);
@@ -1057,6 +1059,7 @@ export class ExpressionFunctionCall extends Expression {
     for (let formal of f.formals) {
       if (!callEnvironment.ownsVariable(formal.name)) {
         if (env.ownsVariable(formal.name)) {
+          providedParameters.push(formal.name);
           callEnvironment.bind(formal.name, env.variables[formal.name]);
         } else if (formal.defaultThunk) {
           const value = formal.defaultThunk.evaluate(env);
@@ -1742,14 +1745,14 @@ export class ExpressionVector extends ExpressionData {
     super(elements, where, unevaluated, prevalues);
 
     this.functions = {
-      normalize: new FunctionDefinition('normalize', [], new ExpressionVectorNormalize(this)),
-      size: new FunctionDefinition('size', [], new ExpressionVectorSize(this)),
-      magnitude: new FunctionDefinition('magnitude', [], new ExpressionVectorMagnitude(this)),
-      toCartesian: new FunctionDefinition('toCartesian', [], new ExpressionVectorToCartesian(this)),
-      add: new FunctionDefinition('add', [new FormalParameter('item')], new ExpressionVectorAdd(this)),
-      rotateAround: new FunctionDefinition('rotateAround', [new FormalParameter('pivot'), new FormalParameter('degrees')], new ExpressionVectorRotateAround(this)),
-      rotate: new FunctionDefinition('rotate', [new FormalParameter('degrees')], new ExpressionVectorRotate(this)),
-      rotate90: new FunctionDefinition('rotate90', [], new ExpressionVectorRotate90(this)),
+      normalize: new FunctionDefinition('normalize', '', [], new ExpressionVectorNormalize(this)),
+      size: new FunctionDefinition('size', '', [], new ExpressionVectorSize(this)),
+      magnitude: new FunctionDefinition('magnitude', '', [], new ExpressionVectorMagnitude(this)),
+      toCartesian: new FunctionDefinition('toCartesian', '', [], new ExpressionVectorToCartesian(this)),
+      add: new FunctionDefinition('add', '', [new FormalParameter('item')], new ExpressionVectorAdd(this)),
+      rotateAround: new FunctionDefinition('rotateAround', '', [new FormalParameter('pivot'), new FormalParameter('degrees')], new ExpressionVectorRotateAround(this)),
+      rotate: new FunctionDefinition('rotate', '', [new FormalParameter('degrees')], new ExpressionVectorRotate(this)),
+      rotate90: new FunctionDefinition('rotate90', '', [], new ExpressionVectorRotate90(this)),
     };
   }
 
@@ -2450,7 +2453,6 @@ export class ExpressionRevolve extends ExpressionFunction {
     const degrees = env.variables.degrees.value;
     const axis = env.variables.axis;
     const pivot = env.variables.pivot;
-    console.log("degrees:", degrees);
 
     if (degrees < -360 || degrees > 360) {
       throw new LocatedException(env.variables.degrees.unevaluated.where, 'I expected the number of degrees given to <var>revolve</var> to be in the interval [-360, 360].');

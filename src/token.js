@@ -62,6 +62,14 @@ export class SourceLocation {
     return this.lineStart <= row && row <= this.lineEnd && this.columnStart <= column && column - 1 <= this.columnEnd;
   }
 
+  precedes(column, row) {
+    return this.lineEnd < row || (this.lineEnd === row && this.columnEnd < column);
+  }
+
+  succeeds(column, row) {
+    return this.lineStart > row || (this.lineStart === row && this.columnStart > column);
+  }
+
   clone() {
     return new SourceLocation(this.lineStart, this.lineEnd, this.columnStart, this.columnEnd);
   }

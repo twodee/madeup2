@@ -46,9 +46,18 @@ export class InterpreterEnvironment extends Environment {
     this.root = this;
     this.polylines = [new Polyline()];
     this.meshes = [];
+    this.calls = [];
 
     this.bindGlobalFunctions(Builtins);
   }
+
+  addCall(where, documentation, providedParameters) {
+    this.calls.push({where, documentation, providedParameters});
+  }
+
+  // get currentCall() {
+    // return this.calls[this.calls.length - 1];
+  // }
 
   seal() {
     const polyline = this.polylines[this.polylines.length - 1];
@@ -86,6 +95,7 @@ export class InterpreterEnvironment extends Environment {
       polylines: this.polylines.map(polyline => polyline.toPod()),
       renderMode: this.renderMode,
       meshes: this.meshes.map(mesh => mesh.toPod()),
+      calls: this.calls,
     });
     return pod;
   }

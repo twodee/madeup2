@@ -32,28 +32,14 @@ export class FunctionDefinition {
     this.description = description;
     this.formals = formals;
     this.body = body;
+    this.documentation = this.toDocumentation();
   }
 
-  toDocString(environment) {
-    const div = doc.createElement('div');
-
-    const name = doc.createElement('div');
-    name.appendChild(doc.createTextNode(this.name));
-    div.appendChild(name);
-
-    for (let f of this.formals) {
-      div.appendChild(f.toDocString(doc, environment));
-    }
-
-    return div;
-    // return this.name + "\n" + this.formals.map(f => f.toDocString(environment)).join("\n");
-  }
-
-  toCallRecord(env) {
+  toDocumentation() {
     return {
       name: this.name,
       description: this.description,
-      parameters: this.formals.map(f => f.toCallRecord(env)),
+      parameters: this.formals?.map(f => f.toDocumentation()),
     };
   }
 }
@@ -88,10 +74,9 @@ export class FormalParameter {
     return div;
   }
 
-  toCallRecord(env) {
+  toDocumentation() {
     return {
       name: this.name,
-      isProvided: env.ownsVariable(this.name),
       defaultExpression: this.defaultThunk?.toPretty(),
       description: this.description,
     };

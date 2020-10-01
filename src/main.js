@@ -12,6 +12,7 @@ import {
   // RenderEnvironment,
 // } from './render.js';
 
+import {SourceLocation} from './token.js';
 import {interpret} from './interpreter.js';
 import {Messager} from './messager.js';
 import Interpreter from './interpreter.worker.js';
@@ -55,6 +56,7 @@ let solidMeshProgram;
 let wireMeshProgram;
 
 let isWireframe = false;
+let calls;
 
 let eyeToClip;
 let modelToEye;
@@ -126,6 +128,11 @@ function stopInterpreting() {
 function postInterpret(pod) {
   console.log("pod:", pod);
 
+  calls = pod.calls.map(call => ({
+    where: SourceLocation.reify(call.where),
+    documentation: call.documentation,
+    providedParameters: call.providedParameters,
+  }));
   for (let object of pathObjects) {
     object.vertexArray.destroy();
     object.vertexAttributes.destroy();
@@ -367,25 +374,41 @@ function startInterpreting(renderMode, isErrorDelayed) {
 
 function onChangeCursor() {
   const cursor = editor.getCursorPosition();
-  console.log("cursor.column:", cursor.column);
-  console.log("cursor.row:", cursor.row);
-  // scene.castCursor(cursor.column, cursor.row);
+
+  if (calls && calls.length > 0) {
+
+    // We want to find the latest call that contains the cursor. Function calls
+    // can be nested as parameters. The outermost call will appear in the list
+    // before the nested calls, so let's start from the end and work backward.
+
+    // Breeze backward through all the strict successors.
+    let i = calls.length - 1;
+    while (i >= 0 && calls[i].where.succeeds(cursor.column, cursor.row)) {
+      i -= 1;
+    }
+
+    // We've either gone off the beginning of the list, or we've hit the
+    // innermost call.
+    if (i >= 0 && calls[i].where.contains(cursor.column, cursor.row)) {
+      showDocs(calls[i].documentation, calls[i].providedParameters);
+    }
+  }
 }
 
 // --------------------------------------------------------------------------- 
 
-function showDocs(callObject) {
+function showDocs(documentation, providedParameters) {
   const docsDiv = document.createElement('div');
   docsDiv.classList.add('function-docs');
 
   const nameDiv = document.createElement('h2');
   nameDiv.classList.add('function-docs-heading', 'monospace');
-  nameDiv.appendChild(document.createTextNode(callObject.name));
+  nameDiv.appendChild(document.createTextNode(documentation.name));
   docsDiv.appendChild(nameDiv);
 
   const descriptionDiv = document.createElement('div');
   descriptionDiv.classList.add('function-docs-description');
-  descriptionDiv.appendChild(document.createTextNode(callObject.description));
+  descriptionDiv.appendChild(document.createTextNode(documentation.description));
   docsDiv.appendChild(descriptionDiv);
 
   const parametersTitleDiv = document.createElement('h3');
@@ -393,13 +416,13 @@ function showDocs(callObject) {
   parametersTitleDiv.appendChild(document.createTextNode('Parameters'));
   docsDiv.appendChild(parametersTitleDiv);
 
-  if (callObject.parameters.length === 0) {
+  if (documentation.parameters.length === 0) {
     docsDiv.appendChild(document.createTextNode('None.'))
   } else {
     const grid = document.createElement('div');
     grid.classList.add('function-docs-parameter-grid');
 
-    for (let parameter of callObject.parameters) {
+    for (let parameter of documentation.parameters) {
       // const parameterDiv = document.createElement('div');
       // parameterDiv.classList.add('function-docs-parameter');
 
@@ -408,7 +431,7 @@ function showDocs(callObject) {
       inputElement.classList.add('function-docs-parameter-status');
       inputElement.onclick = () => false;
       inputElement.setAttribute('type', 'checkbox');
-      if (parameter.isProvided) {
+      if (providedParameters.includes(parameter.name)) {
         inputElement.setAttribute('checked', 'checked');
       } else if (parameter.defaultExpression) {
         inputElement.indeterminate = true;
@@ -452,8 +475,8 @@ function showDocs(callObject) {
   returnTitleDiv.appendChild(document.createTextNode('Returns'));
   docsDiv.appendChild(returnTitleDiv);
 
-  if (callObject.returns) {
-    docsDiv.appendChild(document.createTextNode(callObject.returns))
+  if (documentation.returns) {
+    docsDiv.appendChild(document.createTextNode(documentation.returns))
   } else {
     docsDiv.appendChild(document.createTextNode('None.'))
   }
