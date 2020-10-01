@@ -274,7 +274,7 @@ html.grabbing {
 
 .function-docs-parameter-grid {
   display: grid;
-  grid-template-columns: auto auto auto;
+  grid-template-columns: auto auto 1fr;
   /* grid-column-gap: 5px; */
   /* grid-row-gap: 5px; */
   font-family: monospace;

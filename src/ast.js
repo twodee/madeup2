@@ -383,7 +383,7 @@ export class ExpressionString extends ExpressionData {
     super(value, where, unevaluated, prevalues);
 
     this.functions = {
-      size: new FunctionDefinition('size', '', [], new ExpressionStringSize(this)),
+      length: new FunctionDefinition('length', 'Returns the number of characters in this string.', [], new ExpressionStringLength(this)),
     };
   }
 
@@ -459,7 +459,7 @@ export class ExpressionString extends ExpressionData {
 
 // --------------------------------------------------------------------------- 
 
-export class ExpressionStringSize extends Expression {
+export class ExpressionStringLength extends Expression {
   static precedence = Precedence.Property;
 
   constructor(instance, unevaluated) {

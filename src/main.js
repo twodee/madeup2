@@ -66,6 +66,7 @@ let aspectRatio;
 
 let scene;
 let isSaved = true;
+let interpretTimeout;
 let isMouseDown;
 let contentBounds;
 let near = 0.01;
@@ -126,7 +127,8 @@ function stopInterpreting() {
 // --------------------------------------------------------------------------- 
 
 function postInterpret(pod) {
-  console.log("pod:", pod);
+  console.log(new Date());
+  // console.log("pod:", pod);
 
   calls = pod.calls.map(call => ({
     where: SourceLocation.reify(call.where),
@@ -489,15 +491,10 @@ function showDocs(documentation, providedParameters) {
 // --------------------------------------------------------------------------- 
 
 function onSourceChanged() {
-  // If the source was changed through the text editor, but not through the
-  // canvas, the marks are no longer valid.
-  // if (scene) {
-    // scene.stale();
-  // }
-  // clearSelection();
-  startInterpreting(RenderMode.Pathify, true);
   isSaved = false;
   syncTitle();
+  clearTimeout(interpretTimeout);
+  interpretTimeout = setTimeout(() => startInterpreting(RenderMode.Pathify, true), 1000);
 }
 
 // --------------------------------------------------------------------------- 
@@ -576,7 +573,7 @@ function initializeDOM() {
   }
   editor.getSession().on('change', onSourceChanged);
   editor.getSession().setMode("ace/mode/madeup");
-  editor.getSession().selection.on('changeCursor', onChangeCursor); 
+  editor.getSession().selection.on('changeCursor', onChangeCursor);
 
   saveButton.addEventListener('click', save);
 
