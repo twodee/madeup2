@@ -59,7 +59,7 @@ export class SourceLocation {
   }
 
   contains(column, row) {
-    return this.lineStart <= row && row <= this.lineEnd && this.columnStart <= column && column - 1 <= this.columnEnd;
+    return !this.precedes(column, row) && !this.succeeds(column, row);
   }
 
   precedes(column, row) {

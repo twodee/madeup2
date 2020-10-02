@@ -8,7 +8,8 @@ self.addEventListener('message', event => {
         message => self.postMessage({type: 'output', payload: message}),
         message => self.postMessage({type: event.data.isErrorDelayed ? 'output-delayed' : 'output', payload: message}),
         () => self.postMessage({type: 'clear-error'}),
-        callRecord => self.postMessage({type: 'show-docs', payload: callRecord}),
+        callRecord => self.postMessage({type: 'show-call-docs', payload: callRecord}),
+        docMap => self.postMessage({type: 'register-doc-map', payload: docMap}),
         event.data.renderMode
       );
 

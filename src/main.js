@@ -56,7 +56,7 @@ let solidMeshProgram;
 let wireMeshProgram;
 
 let isWireframe = false;
-let calls;
+let docMap;
 
 let eyeToClip;
 let modelToEye;
@@ -126,15 +126,19 @@ function stopInterpreting() {
 
 // --------------------------------------------------------------------------- 
 
-function postInterpret(pod) {
-  console.log(new Date());
-  // console.log("pod:", pod);
-
-  calls = pod.calls.map(call => ({
+function registerDocMap(pod) {
+  docMap = pod.map(call => ({
     where: SourceLocation.reify(call.where),
     documentation: call.documentation,
     providedParameters: call.providedParameters,
   }));
+}
+
+// --------------------------------------------------------------------------- 
+
+function postInterpret(pod) {
+  console.log("pod:", pod);
+
   for (let object of pathObjects) {
     object.vertexArray.destroy();
     object.vertexAttributes.destroy();
@@ -345,8 +349,10 @@ function startInterpreting(renderMode, isErrorDelayed) {
       Messager.logDelay(event.data.payload);
     } else if (event.data.type === 'clear-error') {
       Messager.clearError();
-    } else if (event.data.type === 'show-docs') {
-      showDocs(event.data.payload);
+    } else if (event.data.type === 'show-call-docs') {
+      showCallDocs(event.data.payload);
+    } else if (event.data.type === 'register-doc-map') {
+      registerDocMap(event.data.payload);
     } else if (event.data.type === 'environment') {
       stopInterpreting();
       postInterpret(event.data.payload);
@@ -364,7 +370,7 @@ function startInterpreting(renderMode, isErrorDelayed) {
       isErrorDelayed,
     });
   } else {
-    const scene = interpret(editor.getValue(), Messager.log, isErrorDelayed ? Messager.logDelay : Messager.log, Messager.clearError, showDocs, renderMode);
+    const scene = interpret(editor.getValue(), Messager.log, isErrorDelayed ? Messager.logDelay : Messager.log, Messager.clearError, showCallDocs, registerDocMap, renderMode);
     stopInterpreting();
     if (scene) {
       postInterpret(scene.toPod());
@@ -377,40 +383,40 @@ function startInterpreting(renderMode, isErrorDelayed) {
 function onChangeCursor() {
   const cursor = editor.getCursorPosition();
 
-  if (calls && calls.length > 0) {
+  if (docMap && docMap.length > 0) {
 
     // We want to find the latest call that contains the cursor. Function calls
     // can be nested as parameters. The outermost call will appear in the list
     // before the nested calls, so let's start from the end and work backward.
 
     // Breeze backward through all the strict successors.
-    let i = calls.length - 1;
-    while (i >= 0 && calls[i].where.succeeds(cursor.column, cursor.row)) {
+    let i = docMap.length - 1;
+    while (i >= 0 && docMap[i].where.succeeds(cursor.column, cursor.row)) {
       i -= 1;
     }
 
     // We've either gone off the beginning of the list, or we've hit the
     // innermost call.
-    if (i >= 0 && calls[i].where.contains(cursor.column, cursor.row)) {
-      showDocs(calls[i].documentation, calls[i].providedParameters);
+    if (i >= 0 && docMap[i].where.contains(cursor.column, cursor.row)) {
+      showCallDocs(docMap[i]);
     }
   }
 }
 
 // --------------------------------------------------------------------------- 
 
-function showDocs(documentation, providedParameters) {
+function showCallDocs(callRecord) {
   const docsDiv = document.createElement('div');
   docsDiv.classList.add('function-docs');
 
   const nameDiv = document.createElement('h2');
   nameDiv.classList.add('function-docs-heading', 'monospace');
-  nameDiv.appendChild(document.createTextNode(documentation.name));
+  nameDiv.appendChild(document.createTextNode(callRecord.documentation.name));
   docsDiv.appendChild(nameDiv);
 
   const descriptionDiv = document.createElement('div');
   descriptionDiv.classList.add('function-docs-description');
-  descriptionDiv.appendChild(document.createTextNode(documentation.description));
+  descriptionDiv.appendChild(document.createTextNode(callRecord.documentation.description));
   docsDiv.appendChild(descriptionDiv);
 
   const parametersTitleDiv = document.createElement('h3');
@@ -418,13 +424,13 @@ function showDocs(documentation, providedParameters) {
   parametersTitleDiv.appendChild(document.createTextNode('Parameters'));
   docsDiv.appendChild(parametersTitleDiv);
 
-  if (documentation.parameters.length === 0) {
+  if (callRecord.documentation.parameters.length === 0) {
     docsDiv.appendChild(document.createTextNode('None.'))
   } else {
     const grid = document.createElement('div');
     grid.classList.add('function-docs-parameter-grid');
 
-    for (let parameter of documentation.parameters) {
+    for (let parameter of callRecord.documentation.parameters) {
       // const parameterDiv = document.createElement('div');
       // parameterDiv.classList.add('function-docs-parameter');
 
@@ -433,7 +439,7 @@ function showDocs(documentation, providedParameters) {
       inputElement.classList.add('function-docs-parameter-status');
       inputElement.onclick = () => false;
       inputElement.setAttribute('type', 'checkbox');
-      if (providedParameters.includes(parameter.name)) {
+      if (callRecord.providedParameters.includes(parameter.name)) {
         inputElement.setAttribute('checked', 'checked');
       } else if (parameter.defaultExpression) {
         inputElement.indeterminate = true;
@@ -477,8 +483,8 @@ function showDocs(documentation, providedParameters) {
   returnTitleDiv.appendChild(document.createTextNode('Returns'));
   docsDiv.appendChild(returnTitleDiv);
 
-  if (documentation.returns) {
-    docsDiv.appendChild(document.createTextNode(documentation.returns))
+  if (callRecord.documentation.returns) {
+    docsDiv.appendChild(document.createTextNode(callRecord.documentation.returns))
   } else {
     docsDiv.appendChild(document.createTextNode('None.'))
   }
@@ -693,6 +699,9 @@ function initializeDOM() {
   const editorMessagerResizer = document.getElementById('editor-messager-resizer');
   editorMessagerResizer.addEventListener('mousedown', generateHeightResizer(editorMessagerResizer)); 
 
+  const settingsDocsResizer = document.getElementById('settings-docs-resizer');
+  settingsDocsResizer.addEventListener('mousedown', generateHeightResizer(settingsDocsResizer)); 
+
   const leftMiddleResizer = document.getElementById('left-middle-resizer');
   leftMiddleResizer.addEventListener('mousedown', generateLeftResizer(leftMiddleResizer, 1)); 
 
@@ -709,7 +718,7 @@ function initializeDOM() {
     localStorage.setItem('is-panel-open', true);
     openPanelButton.style.display = 'none';
 
-    panel.style.display = 'block';
+    panel.style.display = 'flex';
     const bounds = panel.getBoundingClientRect(); 
 
     const startValue = bounds.right;
@@ -790,7 +799,7 @@ function initializeDOM() {
 
     const isPanelOpen = localStorage.getItem('is-panel-open') === 'true';
     if (isPanelOpen) {
-      right.style.display = 'block';
+      right.style.display = 'flex';
       middleRightResizer.style.display = 'block';
       closePanelButton.style.display = 'block';
       openPanelButton.style.display = 'none';

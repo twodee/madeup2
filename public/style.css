@@ -29,13 +29,9 @@ body {
 }
 
 #messager-container {
-  /* Must be relative to anchor resizer. */
-  /* position: relative; */
-
-  flex: 0 1 auto;
+  flex: 0 1 200px;
   background-color: #333333;
   color: #CCCCCC;
-  height: 200px;
 }
 
 #messager {
@@ -88,13 +84,28 @@ body {
   min-width: 300px;
 }
 
-#right {
+#settings-root, #docs-root {
+  padding: 10px;
   overflow-y: scroll;
+}
+
+#settings-root {
+  /* flex-basis: auto; */
+  flex: 1 1 auto;
+}
+
+#docs-root {
+  flex: 0 1 400px;
+}
+
+#right {
   box-sizing: border-box;
   background-color: black;
   flex: 0 1 auto;
-  padding: 10px;
   color: white;
+
+  display: flex;
+  flex-direction: column;
 
   /* I'd prefer not to set width and just let it default to min-width. But
    * that's not how it works. If I don't set the width, the sidebar will not

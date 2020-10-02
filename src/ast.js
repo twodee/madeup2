@@ -1052,7 +1052,7 @@ export class ExpressionFunctionCall extends Expression {
     }
 
     if (unknownParameters.length > 0) {
-      throw new LocatedException(this.where, `I didn't expect function <var>${this.nameToken.source}</var> to be provided a parameter named <var>${unknownParameters[0]}</var>. I'm not sure what to do with that parameter.\n\nPerhaps the documentation might help.`, f.toCallRecord(callEnvironment));
+      throw new LocatedException(this.where, `I didn't expect function <var>${this.nameToken.source}</var> to be provided a parameter named <var>${unknownParameters[0]}</var>. I'm not sure what to do with that parameter.\n\nPerhaps the documentation might help.`, {documentation: f.documentation, providedParameters});
     }
 
     // Look for any missing formals. Supply implicit or default if possible.
@@ -1065,7 +1065,7 @@ export class ExpressionFunctionCall extends Expression {
           const value = formal.defaultThunk.evaluate(env);
           callEnvironment.bind(formal.name, value);
         } else {
-          throw new LocatedException(this.where, `I expected function <var>${this.nameToken.source}</var> to be provided a parameter named <var>${formal.name}</var>.\n\nPerhaps the documentation might help.`, f.toCallRecord(callEnvironment));
+          throw new LocatedException(this.where, `I expected function <var>${this.nameToken.source}</var> to be provided a parameter named <var>${formal.name}</var>.\n\nPerhaps the documentation might help.`, {documentation: f.documentation, providedParameters});
         }
       }
     }
@@ -2225,7 +2225,7 @@ export class ExpressionDowel extends ExpressionFunction {
   evaluate(env) {
     const nsides = env.variables.nsides.value;
     const twist = env.variables.twist.value;
-    const round = env.variables.round.value;
+    const sharpness = env.variables.sharpness.value;
 
     const polyline = env.root.seal();
     const positions = [];
@@ -2327,7 +2327,7 @@ export class ExpressionDowel extends ExpressionFunction {
       const radians = Math.acos(forward.dot(backward.inverse()));
       const degrees = MathUtilities.toDegrees(radians);
 
-      if (degrees <= round || stops[0].radii.length > 1) {
+      if (degrees <= sharpness || stops[0].radii.length > 1) {
         const tangent = forward.add(backward.inverse()).normalize();
         const plane = new Plane(stops[0].position, tangent);
 
@@ -2347,7 +2347,7 @@ export class ExpressionDowel extends ExpressionFunction {
           positions[i] = backRotater.multiplyVector(unrotatedPosition.toVector4(1)).toVector3();
         }
 
-        const nwedges = Math.ceil(degrees / round);
+        const nwedges = Math.ceil(degrees / sharpness);
         const deltaDegrees = degrees / nwedges;
 
         const rotater = Matrix4.rotateAround(axis, deltaDegrees, pivot);
@@ -2382,7 +2382,7 @@ export class ExpressionDowel extends ExpressionFunction {
         const radians = Math.acos(from.dot(to));
         const degrees = MathUtilities.toDegrees(radians);
 
-        if (degrees <= round || stops[i].radii.length > 1) {
+        if (degrees <= sharpness || stops[i].radii.length > 1) {
           // Cast rays from the preceding ring into a perpendicular plane.
           const perpendicularPlane = new Plane(stops[i].position, to);
           const vertexZeroIndex = positions.length - nsides;
@@ -2406,7 +2406,7 @@ export class ExpressionDowel extends ExpressionFunction {
           intersectPlaneAndRescale(plane, to, stops[i - 1].position, stops[i].radii[0], positions.length - nsides);
 
           const axis = to.cross(from).normalize();
-          const nwedges = Math.ceil(degrees / round);
+          const nwedges = Math.ceil(degrees / sharpness);
           const deltaDegrees = degrees / nwedges;
 
           for (let wedgeIndex = 0; wedgeIndex < nwedges; ++wedgeIndex) {

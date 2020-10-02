@@ -103,17 +103,22 @@ export class InterpreterEnvironment extends Environment {
 
 // --------------------------------------------------------------------------- 
 
-export function interpret(source, log, logError, clearError, showDocs, renderMode) {
+export function interpret(source, log, logError, clearError, showCallDocs, registerDocMap, renderMode) {
+  const env = InterpreterEnvironment.create(source, log, renderMode);
+
   try {
     let tokens = lex(source);
     let ast = parse(tokens);
-    const env = InterpreterEnvironment.create(source, log, renderMode);
-    ast.evaluate(env);
+    try {
+      ast.evaluate(env);
+    } finally {
+      registerDocMap(env.calls);
+    }
     clearError();
     return env;
   } catch (e) {
     if (e.callRecord) {
-      showDocs(e.callRecord);
+      showCallDocs(e.callRecord);
     }
 
     if (e instanceof MessagedException) {
