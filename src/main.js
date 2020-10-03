@@ -38,11 +38,13 @@ let pathifyButton;
 let solidifyButton;
 let fitButton;
 let saveButton;
+let exportObjButton;
 let stopButton;
 let interpreterWorker;
 // let evaluateSpinner;
 let canvas;
 let centerTransform;
+let meshes;
 
 let polylines;
 
@@ -101,18 +103,18 @@ function stopSpinning(spinner, button) {
 
 // --------------------------------------------------------------------------- 
 
-// function downloadBlob(name, blob) {
-  // let link = document.createElement('a');
-  // link.download = name;
-  // link.href = URL.createObjectURL(blob);
+function downloadBlob(name, blob) {
+  let link = document.createElement('a');
+  link.download = name;
+  link.href = URL.createObjectURL(blob);
   // Firefox needs the element to be live for some reason.
-  // document.body.appendChild(link);
-  // link.click();
-  // setTimeout(() => {
-    // URL.revokeObjectURL(link.href);
-    // document.body.removeChild(link);
-  // });
-// }
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(link.href);
+    document.body.removeChild(link);
+  });
+}
 
 // --------------------------------------------------------------------------- 
 
@@ -182,7 +184,7 @@ function postInterpret(pod) {
       }
     }
   } else if (pod.renderMode === RenderMode.Solidify) {
-    const meshes = pod.meshes.map(pod => Trimesh.fromPod(pod));
+    meshes = pod.meshes.map(pod => Trimesh.fromPod(pod));
     for (let mesh of meshes) {
       mesh.separateFaces();
 
@@ -336,6 +338,8 @@ function postInterpret(pod) {
 // --------------------------------------------------------------------------- 
 
 function startInterpreting(renderMode, isErrorDelayed) {
+  meshes.splice(0, meshes.length);
+
   stopInterpreting();
   stopButton.classList.remove('hidden');
 
@@ -524,6 +528,7 @@ function initialize() {
   pathObjects = [];
   polylines = [];
   meshObjects = [];
+  meshes = [];
   isMouseDown = false;
   // contentBounds = {
     // minimum: new Vector3(0, 0, 0),
@@ -571,6 +576,7 @@ function initializeDOM() {
   saveButton = document.getElementById('save-button');
   stopButton = document.getElementById('stop-button');
   // evaluateSpinner = document.getElementById('evaluate-spinner');
+  exportObjButton = document.getElementById('export-obj-button');
 
   new Messager(document.getElementById('messager'), document, highlight);
 
@@ -599,6 +605,8 @@ function initializeDOM() {
   solidifyButton.addEventListener('click', () => {
     startInterpreting(RenderMode.Solidify, false);
   });
+
+  exportObjButton.addEventListener('click', exportObj);
 
   if (source0) {
     left.style.width = '300px';
@@ -831,6 +839,14 @@ function initializeDOM() {
   window.addEventListener('mousemove', mouseMove);
 
   window.addEventListener('resize', resizeWindow, false);
+}
+
+// --------------------------------------------------------------------------- 
+
+function exportObj() {
+  const obj = Trimesh.mergeToObj(meshes.map((mesh, i) => ({name: `mesh${i}`, mesh})));
+  let blob = new Blob([obj], {type: 'text/plain;charset=utf-8'});
+  downloadBlob('download.obj', blob);
 }
 
 // --------------------------------------------------------------------------- 
