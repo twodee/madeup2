@@ -74,7 +74,6 @@ let contentBounds;
 let near = 0.01;
 
 let cursorObject;
-let quadObject;
 let panslation;
 let mouseDownAt;
 let camera;
@@ -191,6 +190,7 @@ function postInterpret(pod) {
       const vertexAttributes = new VertexAttributes();
       vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.getFlatPositions());
       vertexAttributes.addAttribute('vnormal', mesh.vertexCount, 4, mesh.getFlatNormals());
+      vertexAttributes.addAttribute('vcolor', mesh.vertexCount, 4, mesh.getFlatColors());
       vertexAttributes.addIndices(mesh.getFlatFaces());
 
       if (isWireframe) {
@@ -864,20 +864,6 @@ function initializeGL() {
   initializePathifyNodeObject();
   initializeCursor();
 
-  const mesh = Prefab.quadrilateral(0.0041421356237309505 * 2 - 0.00001, new Vector3(0, 0, 0)); 
-
-  const vertexAttributes = new VertexAttributes();
-  vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.getFlatPositions());
-  vertexAttributes.addAttribute('vnormal', mesh.vertexCount, 4, mesh.getFlatNormals());
-  vertexAttributes.addIndices(mesh.getFlatFaces());
-
-  const vertexArray = new VertexArray(solidMeshProgram, vertexAttributes);
-
-  quadObject = {
-    vertexAttributes,
-    vertexArray,
-  };
-
   reset();
 }
 
@@ -1083,9 +1069,11 @@ uniform mat4 modelToEye;
 
 in vec3 vposition;
 in vec3 vnormal;
+in vec3 vcolor;
 
 out vec3 positionEye;
 out vec3 normalEye;
+out vec3 albedo;
 
 void main() {
   vec4 positionEye4 = modelToEye * vec4(vposition, 1.0);
@@ -1093,6 +1081,7 @@ void main() {
 
   normalEye = normalize((modelToEye * vec4(vnormal, 0.0)).xyz);
   positionEye = positionEye4.xyz;
+  albedo = vcolor;
 }
   `;
 
@@ -1101,11 +1090,12 @@ precision mediump float;
 
 const vec3 lightPositionEye = vec3(1.0, 1.0, 1.0);
 // const vec3 albedo = vec3(0.478, 0.478, 0.478);
-const vec3 albedo = vec3(1, 0.5, 0);
+// const vec3 albedo = vec3(1, 0.5, 0);
 const vec3 flippedAlbedo = vec3(0.0, 0.5, 1.0);
 
 in vec3 positionEye;
 in vec3 normalEye;
+in vec3 albedo;
 
 out vec4 fragmentColor;
 
@@ -1137,11 +1127,13 @@ uniform mat4 modelToEye;
 
 in vec3 vposition;
 in vec3 vnormal;
+in vec3 vcolor;
 in vec3 vbarycentric;
 
 out vec3 positionEye;
 out vec3 normalEye;
 out vec3 fbarycentric;
+out vec3 albedo;
 
 void main() {
   vec4 positionEye4 = modelToEye * vec4(vposition, 1.0);
@@ -1150,6 +1142,7 @@ void main() {
   normalEye = normalize((modelToEye * vec4(vnormal, 0.0)).xyz);
   positionEye = positionEye4.xyz;
   fbarycentric = vbarycentric;
+  albedo = vcolor;
 }
   `;
 
@@ -1157,11 +1150,12 @@ void main() {
 precision mediump float;
 
 const vec3 lightPositionEye = vec3(1.0, 1.0, 1.0);
-const vec3 albedo = vec3(1.0, 0.5, 0.0);
+// const vec3 albedo = vec3(1.0, 0.5, 0.0);
 
 in vec3 positionEye;
 in vec3 normalEye;
 in vec3 fbarycentric;
+in vec3 albedo;
 
 out vec4 fragmentColor;
 
@@ -1339,14 +1333,6 @@ function render() {
       solidMeshProgram.unbind();
     }
   }
-
-  // solidMeshProgram.bind();
-  // solidMeshProgram.setUniformMatrix4('eyeToClip', eyeToClip);
-  // solidMeshProgram.setUniformMatrix4('modelToEye', Matrix4.translate(0, 0, -near));
-  // quadObject.vertexArray.bind();
-  // quadObject.vertexArray.drawIndexed(gl.TRIANGLES);
-  // quadObject.vertexArray.unbind();
-  // solidMeshProgram.unbind();
 }
 
 // --------------------------------------------------------------------------- 

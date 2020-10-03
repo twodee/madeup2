@@ -52,11 +52,17 @@ export const Builtins = (function() {
     cubeDescription: 'Generate a cube at each visited location.',
     sphereDescription: 'Generate a sphere at each visited location.',
     sphereNsides: 'The number of lines of longitude on the sphere.',
-    radiusDescription: 'The radius of the vertex, which is only meaningful if the path is solidified into a dowel, cubes, or spheres.',
     nameDescription: 'The name of the object, which is used only to identify it in the exported file.',
+    radiusDescription: 'The radius of the vertex, which is only meaningful if the path is solidified into a dowel, cubes, or spheres.',
   };
 
+  const radiusParameter = new FormalParameter('radius', shared.radiusDescription, new ExpressionReal(0.5));
   const nameParameter = new FormalParameter('name', shared.nameDescription, new ExpressionUnit());
+  const colorParameter = new FormalParameter('color', 'The color of the vertex.', new ExpressionVector([
+    new ExpressionReal(1),
+    new ExpressionReal(0.5),
+    new ExpressionReal(0),
+  ]));
 
   return {
     cubes: new FunctionDefinition('cubes', shared.cubeDescription, [nameParameter], new ExpressionCubes()),
@@ -87,7 +93,7 @@ export const Builtins = (function() {
         new ExpressionReal(1),
         new ExpressionReal(0),
       ])),
-      new FormalParameter('pivot', 'A point lying on the axis of revolution.', new ExpressionVector([
+      new FormalParameter('origin', 'A point lying on the axis of revolution.', new ExpressionVector([
         new ExpressionReal(0),
         new ExpressionReal(0),
         new ExpressionReal(0),
@@ -114,11 +120,13 @@ export const Builtins = (function() {
 
     move: new FunctionDefinition('move', 'Move forward or backward in the current direction.', [
       new FormalParameter('distance', 'The distance to move. A positive distance moves forward; a negative distance moves backward.'),
-      new FormalParameter('radius', shared.radiusDescription, new ExpressionReal(0.5)),
+      radiusParameter,
+      colorParameter,
     ], new ExpressionMove()),
 
     stay: new FunctionDefinition('stay', "Issue a new vertex in the path at the current location. The vertex's other properties, like its radius, may differ.", [
-      new FormalParameter('radius', shared.radiusDescription, new ExpressionReal(0.5)),
+      radiusParameter,
+      colorParameter,
     ], new ExpressionStay()),
 
     yaw: new FunctionDefinition('yaw', "Turn left or right about the cursor's local up axis. A vertex is not added to the current path.", [
@@ -141,14 +149,16 @@ export const Builtins = (function() {
         new ExpressionReal(0),
         new ExpressionReal(0),
       ])),
-      new FormalParameter('radius', new ExpressionReal(0.5)),
+      radiusParameter,
+      colorParameter,
     ], new ExpressionPolarto()),
 
     moveto: new FunctionDefinition('moveto', 'Move to a 3D position of your choosing.', [
       new FormalParameter('x', 'The x-coordinate of the position.'),
       new FormalParameter('y', 'The y-coordinate of the position.'),
       new FormalParameter('z', 'The z-coordinate of the position.', new ExpressionReal(0)),
-      new FormalParameter('radius', shared.radiusDescription, new ExpressionReal(0.5)),
+      radiusParameter,
+      colorParameter,
     ], new ExpressionMoveto()),
 
     // TODO assert that there is a starting position

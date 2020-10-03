@@ -2124,10 +2124,13 @@ export class ExpressionMoveto extends ExpressionFunction {
     const y = env.variables.y.value;
     const z = env.variables.z.value;
     const radius = env.variables.radius.value;
+    const color = env.variables.color;
+    const color3 = new Vector3(color.get(0).value, color.get(1).value, color.get(2).value);
 
     env.root.currentPolyline.turtle.relocate(new Vector3(x, y, z));
     env.root.visit({
       radius,
+      color: color3,
     });
   }
 }
@@ -2140,6 +2143,8 @@ export class ExpressionPolarto extends ExpressionFunction {
     const distance = env.variables.distance.value;
     const degrees = env.variables.degrees.value;
     const origin = env.variables.origin;
+    const color = env.variables.color;
+    const color3 = new Vector3(color.get(0).value, color.get(1).value, color.get(2).value);
 
     const radians = MathUtilities.toRadians(degrees);
     const x = distance * Math.cos(radians) + origin.get(0).value;
@@ -2149,6 +2154,7 @@ export class ExpressionPolarto extends ExpressionFunction {
     env.root.currentPolyline.turtle.relocate(new Vector3(x, y, z));
     env.root.visit({
       radius,
+      color: color3,
     });
   }
 }
@@ -2159,10 +2165,13 @@ export class ExpressionMove extends ExpressionFunction {
   evaluate(env) {
     const distance = env.variables.distance.value;
     const radius = env.variables.radius.value;
+    const color = env.variables.color;
+    const color3 = new Vector3(color.get(0).value, color.get(1).value, color.get(2).value);
 
     env.root.currentPolyline.turtle.advance(distance);
     env.root.visit({
       radius,
+      color: color3,
     });
   }
 }
@@ -2172,8 +2181,11 @@ export class ExpressionMove extends ExpressionFunction {
 export class ExpressionStay extends ExpressionFunction {
   evaluate(env) {
     const radius = env.variables.radius.value;
+    const color = env.variables.color;
+    const color3 = new Vector3(color.get(0).value, color.get(1).value, color.get(2).value);
     env.root.visit({
       radius,
+      color: color3,
     });
   }
 }
@@ -2219,6 +2231,7 @@ export class ExpressionHome extends ExpressionFunction {
     env.root.currentPolyline.turtle.relocate(vertex.position);
     env.root.visit({
       radius: vertex.radius,
+      color: vertex.color,
     });
   }
 }
@@ -2557,7 +2570,9 @@ export class ExpressionCubes extends ExpressionFunction {
 
     for (let [i, vertex] of polyline.vertices.entries()) {
       const mesh = Prefab.cube(vertex.radius * 2, vertex.position);
-      env.root.addMesh(name instanceof ExpressionUnit ? undefined : `${name}-${i}`, mesh);
+      mesh.color(vertex.color);
+      const actualName = name instanceof ExpressionUnit ? undefined : (polyline.vertices.length === 1 ? name : `${name}-${i}`);
+      env.root.addMesh(actualName, mesh);
     }
   }
 }
@@ -2572,7 +2587,9 @@ export class ExpressionSpheres extends ExpressionFunction {
 
     for (let [i, vertex] of polyline.vertices.entries()) {
       const mesh = Prefab.sphere(vertex.radius, vertex.position, nsides, Math.ceil(nsides / 2));
-      env.root.addMesh(name instanceof ExpressionUnit ? undefined : `${name}-${i}`, mesh);
+      mesh.color(vertex.color);
+      const actualName = name instanceof ExpressionUnit ? undefined : (polyline.vertices.length === 1 ? name : `${name}-${i}`);
+      env.root.addMesh(actualName, mesh);
     }
   }
 }
