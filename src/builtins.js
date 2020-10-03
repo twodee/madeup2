@@ -53,25 +53,30 @@ export const Builtins = (function() {
     sphereDescription: 'Generate a sphere at each visited location.',
     sphereNsides: 'The number of lines of longitude on the sphere.',
     radiusDescription: 'The radius of the vertex, which is only meaningful if the path is solidified into a dowel, cubes, or spheres.',
+    nameDescription: 'The name of the object, which is used only to identify it in the exported file.',
   };
 
-  return {
-    cubes: new FunctionDefinition('cubes', shared.cubeDescription, [], new ExpressionCubes()),
+  const nameParameter = new FormalParameter('name', shared.nameDescription, new ExpressionUnit());
 
-    cube: new FunctionDefinition('cube', shared.cubeDescription, [], new ExpressionCubes()),
+  return {
+    cubes: new FunctionDefinition('cubes', shared.cubeDescription, [nameParameter], new ExpressionCubes()),
+    cube: new FunctionDefinition('cube', shared.cubeDescription, [nameParameter], new ExpressionCubes()),
 
     spheres: new FunctionDefinition('spheres', shared.sphereDescription, [
       new FormalParameter('nsides', shared.sphereNsides, new ExpressionInteger(4)),
+      nameParameter,
     ], new ExpressionSpheres()),
 
     sphere: new FunctionDefinition('sphere', shared.sphereDescription, [
       new FormalParameter('nsides', shared.sphereNsides, new ExpressionInteger(4)),
+      nameParameter,
     ], new ExpressionSpheres()),
 
     dowel: new FunctionDefinition('dowel', 'Thicken the path into a solid dowel whose cross section is a regular polygon.', [
       new FormalParameter('nsides', 'The number of the sides. For example, 4 yields a square dowel.', new ExpressionInteger(4)),
       new FormalParameter('twist', 'The rotation of the dowel around its axis. In degrees.', new ExpressionReal(0)),
       new FormalParameter('sharpness', 'The maximum angle of the bends in the dowel. Bends greater than this value will be rounded.', new ExpressionReal(360)),
+      nameParameter,
     ], new ExpressionDowel()),
 
     revolve: new FunctionDefinition('revolve', 'Revolve the path around an axis to produce a solid.', [
@@ -87,20 +92,24 @@ export const Builtins = (function() {
         new ExpressionReal(0),
         new ExpressionReal(0),
       ])),
+      nameParameter,
     ], new ExpressionRevolve()),
 
     extrude: new FunctionDefinition('extrude', 'TODO', [
       new FormalParameter('axis'),
       new FormalParameter('distance'),
+      nameParameter,
     ], new ExpressionExtrude()),
 
     mesh: new FunctionDefinition('mesh', 'TODO', [
       new FormalParameter('vertices'),
       new FormalParameter('faces'),
+      nameParameter,
     ], new ExpressionMesh()),
 
     polygon: new FunctionDefinition('polygon', 'TODO', [
       new FormalParameter('flip', 'Whether or not to flip the polygon over by reversing the order of its vertices.', new ExpressionBoolean(false)),
+      nameParameter,
     ], new ExpressionPolygon()),
 
     move: new FunctionDefinition('move', 'Move forward or backward in the current direction.', [

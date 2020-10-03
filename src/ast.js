@@ -109,6 +109,10 @@ export class ExpressionUnit extends Expression {
   evaluate(env) {
     return this;
   }
+
+  toPretty() {
+    return ':none';
+  }
 }
 
 // --------------------------------------------------------------------------- 
@@ -2226,6 +2230,7 @@ export class ExpressionDowel extends ExpressionFunction {
     const nsides = env.variables.nsides.value;
     const twist = env.variables.twist.value;
     const sharpness = env.variables.sharpness.value;
+    const name = env.variables.name.value;
 
     const polyline = env.root.seal();
     const positions = [];
@@ -2441,7 +2446,7 @@ export class ExpressionDowel extends ExpressionFunction {
     }
 
     const mesh = new Trimesh(positions, faces);
-    env.root.addMesh(mesh);
+    env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
   }
 }
 
@@ -2453,6 +2458,7 @@ export class ExpressionRevolve extends ExpressionFunction {
     const degrees = env.variables.degrees.value;
     const axis = env.variables.axis;
     const pivot = env.variables.pivot;
+    const name = env.variables.name.value;
 
     if (degrees < -360 || degrees > 360) {
       throw new LocatedException(env.variables.degrees.unevaluated.where, 'I expected the number of degrees given to <var>revolve</var> to be in the interval [-360, 360].');
@@ -2538,7 +2544,7 @@ export class ExpressionRevolve extends ExpressionFunction {
     }
 
     const mesh = new Trimesh(positions, faces);
-    env.root.addMesh(mesh);
+    env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
   }
 }
 
@@ -2547,10 +2553,11 @@ export class ExpressionRevolve extends ExpressionFunction {
 export class ExpressionCubes extends ExpressionFunction {
   evaluate(env) {
     const polyline = env.root.seal();
+    const name = env.variables.name.value;
 
-    for (let vertex of polyline.vertices) {
+    for (let [i, vertex] of polyline.vertices.entries()) {
       const mesh = Prefab.cube(vertex.radius * 2, vertex.position);
-      env.root.addMesh(mesh);
+      env.root.addMesh(name instanceof ExpressionUnit ? undefined : `${name}-${i}`, mesh);
     }
   }
 }
@@ -2561,10 +2568,11 @@ export class ExpressionSpheres extends ExpressionFunction {
   evaluate(env) {
     const polyline = env.root.seal();
     const nsides = env.variables.nsides.value;
+    const name = env.variables.name.value;
 
-    for (let vertex of polyline.vertices) {
+    for (let [i, vertex] of polyline.vertices.entries()) {
       const mesh = Prefab.sphere(vertex.radius, vertex.position, nsides, Math.ceil(nsides / 2));
-      env.root.addMesh(mesh);
+      env.root.addMesh(name instanceof ExpressionUnit ? undefined : `${name}-${i}`, mesh);
     }
   }
 }
@@ -2576,6 +2584,7 @@ export class ExpressionExtrude extends ExpressionFunction {
     const axis = env.variables.axis;
     const distance = env.variables.distance.value;
     const polyline = env.root.seal();
+    const name = env.variables.name.value;
 
     if (polyline.vertices.length < 2) {
       throw new MessagedException("I expected this extrude to have at least 2 vertices.");
@@ -2636,7 +2645,7 @@ export class ExpressionExtrude extends ExpressionFunction {
     }
 
     const mesh = new Trimesh(positions, faces);
-    env.root.addMesh(mesh);
+    env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
   }
 }
 
@@ -2646,6 +2655,7 @@ export class ExpressionPolygon extends ExpressionFunction {
   evaluate(env) {
     const polyline = env.root.seal();
     const isFlipped = env.variables.flip.value;
+    const name = env.variables.name.value;
 
     let vertices = [...polyline.vertices];
     if (vertices.length >= 3 && vertices[0].position.distance(vertices[vertices.length - 1].position) < 1e-6) {
@@ -2663,7 +2673,7 @@ export class ExpressionPolygon extends ExpressionFunction {
       mesh.reverseWinding();
     }
 
-    env.root.addMesh(mesh);
+    env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
   }
 }
 
@@ -2687,7 +2697,7 @@ export class ExpressionMesh extends ExpressionFunction {
     });
 
     const mesh = new Trimesh(positions, faces);
-    env.root.addMesh(mesh);
+    env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
   }
 }
 

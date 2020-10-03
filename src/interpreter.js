@@ -77,8 +77,11 @@ export class InterpreterEnvironment extends Environment {
     });
   }
 
-  addMesh(mesh) {
-    this.meshes.push(mesh);
+  addMesh(name, mesh) {
+    if (!name) {
+      name = `mesh${this.meshes.length}`;
+    }
+    this.meshes.push({name, mesh});
   }
 
   static create(source, log, renderMode) {
@@ -94,7 +97,7 @@ export class InterpreterEnvironment extends Environment {
     Object.assign(pod, {
       polylines: this.polylines.map(polyline => polyline.toPod()),
       renderMode: this.renderMode,
-      meshes: this.meshes.map(mesh => mesh.toPod()),
+      meshes: this.meshes.map(({name, mesh}) => ({name, mesh: mesh.toPod()})),
       calls: this.calls,
     });
     return pod;

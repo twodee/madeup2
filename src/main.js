@@ -184,8 +184,8 @@ function postInterpret(pod) {
       }
     }
   } else if (pod.renderMode === RenderMode.Solidify) {
-    meshes = pod.meshes.map(pod => Trimesh.fromPod(pod));
-    for (let mesh of meshes) {
+    meshes = pod.meshes.map(pod => ({name: pod.name, mesh: Trimesh.fromPod(pod.mesh)}));
+    for (let {mesh} of meshes) {
       mesh.separateFaces();
 
       const vertexAttributes = new VertexAttributes();
@@ -224,8 +224,8 @@ function postInterpret(pod) {
 
     if (meshes.length > 0) {
       contentBounds = {
-        minimum: meshes[0].bounds.minimum.clone(),
-        maximum: meshes[0].bounds.maximum.clone(),
+        minimum: meshes[0].mesh.bounds.minimum.clone(),
+        maximum: meshes[0].mesh.bounds.maximum.clone(),
       };
     } else {
       contentBounds = {
@@ -234,7 +234,7 @@ function postInterpret(pod) {
       };
     }
 
-    for (let mesh of meshes) {
+    for (let {mesh} of meshes) {
       mesh.separateFaces();
 
       for (let d = 0; d < 3; ++d) {
@@ -844,7 +844,7 @@ function initializeDOM() {
 // --------------------------------------------------------------------------- 
 
 function exportObj() {
-  const obj = Trimesh.mergeToObj(meshes.map((mesh, i) => ({name: `mesh${i}`, mesh})));
+  const obj = Trimesh.mergeToObj(meshes);
   let blob = new Blob([obj], {type: 'text/plain;charset=utf-8'});
   downloadBlob('download.obj', blob);
 }

@@ -3,6 +3,7 @@ import {
   ExpressionInteger,
   ExpressionReal,
   ExpressionString,
+  ExpressionUnit,
   ExpressionVector,
 } from './ast.js';
 
@@ -47,5 +48,5 @@ export const Symbol = Object.freeze({
   ':open': new ExpressionInteger(0),
   ':closed': new ExpressionInteger(1),
 
-  ':none': new ExpressionInteger(-1),
+  ':none': new ExpressionUnit(),
 });
