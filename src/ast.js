@@ -2247,8 +2247,9 @@ export class ExpressionDowel extends ExpressionFunction {
 
     const polyline = env.root.seal();
     const positions = [];
+    const colors = [];
     const faces = [];
-    const vertices = polyline.vertices;
+    const vertices = [...polyline.vertices];
 
     // Helpers.
     const arePositionsCoincident = (a, b) => a.position.distance(b.position) < 1e-6;
@@ -2258,44 +2259,42 @@ export class ExpressionDowel extends ExpressionFunction {
       faces.push([base + i % nsides, base + (i + 1) % nsides + nsides, base + i + nsides]);
     };
 
-    const intersectPlane = (plane, forward) => {
-      const base = positions.length - nsides;
-
-      for (let i = 0; i < nsides; ++i) {
-        const from = positions[positions.length - nsides];
-        const to = plane.intersectRay(from, forward);
-        positions.push(to);
-        issueFace(base, i);
-      }
-    }
-
-    const intersectPlaneAndRescale = (plane, forward, fromCenter, radius, base) => {
+    const intersectPlaneAndRescale = (plane, forward, fromCenter, variables, base, color) => {
       const toCenter = plane.intersectRay(fromCenter, forward);
       const vertexZeroIndex = positions.length - nsides;
       for (let i = 0; i < nsides; ++i) {
         const from = positions[base + i];
         const to = plane.intersectRay(from, forward);
         const offset = to.subtract(toCenter).normalize();
-        positions.push(toCenter.add(offset.scalarMultiply(radius)));
+        positions.push(toCenter.add(offset.scalarMultiply(variables.radius)));
+        colors.push(variables.color);
         issueFace(vertexZeroIndex, i);
       }
     }
 
     // Bundle all the coincident stops together to make traversal simpler. Each
     // stop will be physically separate from its predecessor and successor. Any
-    // stays will be represented in the array of radii.
+    // stays will be represented in the array of variables.
     const stops = [{
       position: vertices[0].position,
-      radii: [vertices[0].radius],
+      variables: [{
+        radius: vertices[0].radius,
+        color: vertices[0].color,
+      }],
     }];
 
     for (let i = 1; i < vertices.length; ++i) {
+      const variables = {
+        radius: vertices[i].radius,
+        color: vertices[i].color,
+      };
+
       if (arePositionsCoincident(vertices[i], stops[stops.length - 1])) {
-        stops[stops.length - 1].radii.push(vertices[i].radius);
+        stops[stops.length - 1].variables.push(variables);
       } else {
         stops.push({
           position: vertices[i].position,
-          radii: [vertices[i].radius],
+          variables: [variables],
         });
       }
     }
@@ -2312,8 +2311,8 @@ export class ExpressionDowel extends ExpressionFunction {
 
     // Migrate any coincident stays at the end of the dowel to the beginning.
     if (isCircuit && stops.length > 1 && arePositionsCoincident(stops[0], stops[stops.length - 1])) {
-      const {radii} = stops.pop();
-      stops[0].radii = [...radii.slice(0, radii.length - 1), ...stops[0].radii];
+      const {variables} = stops.pop();
+      stops[0].variables = [...variables.slice(0, variables.length - 1), ...stops[0].variables];
     }
 
     // Seed first rings.
@@ -2321,17 +2320,18 @@ export class ExpressionDowel extends ExpressionFunction {
     const rotater = Matrix4.rotate(forward, 360 / nsides);
     const right = forward.perpendicular();
 
-    for (let radius of stops[0].radii) {
-      let offset = right.scalarMultiply(radius).toVector4(0);
+    for (let variables of stops[0].variables) {
+      let offset = right.scalarMultiply(variables.radius).toVector4(0);
       offset = Matrix4.rotate(forward, twist).multiplyVector(offset);
       for (let i = 0; i < nsides; ++i) {
         positions.push(stops[0].position.add(offset));
+        colors.push(variables.color);
         offset = rotater.multiplyVector(offset);
       }
     }
 
     // Issue faces connecting up any concentric rings of this first stop.
-    for (let ringIndex = 0; ringIndex < stops[0].radii.length - 1; ++ringIndex) {
+    for (let ringIndex = 0; ringIndex < stops[0].variables.length - 1; ++ringIndex) {
       for (let i = 0; i < nsides; ++i) {
         issueFace(ringIndex * nsides, i);
       }
@@ -2345,7 +2345,7 @@ export class ExpressionDowel extends ExpressionFunction {
       const radians = Math.acos(forward.dot(backward.inverse()));
       const degrees = MathUtilities.toDegrees(radians);
 
-      if (degrees <= sharpness || stops[0].radii.length > 1) {
+      if (degrees <= sharpness || stops[0].variables.length > 1) {
         const tangent = forward.add(backward.inverse()).normalize();
         const plane = new Plane(stops[0].position, tangent);
 
@@ -2354,7 +2354,7 @@ export class ExpressionDowel extends ExpressionFunction {
         }
       } else {
         const supplementaryRadians = Math.PI - radians;
-        const reach = stops[0].radii[0] / Math.sin(supplementaryRadians * 0.5);
+        const reach = stops[0].variables[0].radius / Math.sin(supplementaryRadians * 0.5);
         const pivot = forward.add(backward).normalize().scalarMultiply(reach).add(stops[0].position);
         const plane = new Plane(pivot, forward);
         const axis = forward.cross(backward).normalize();
@@ -2375,6 +2375,7 @@ export class ExpressionDowel extends ExpressionFunction {
             const from = positions[positions.length - nsides];
             const to = rotater.multiplyVector(positions[positions.length - nsides].toVector4(1)).toVector3();
             positions.push(to);
+            colors.push(stops[0].variables[0].color);
             issueFace(base, stopIndex);
           }
         }
@@ -2389,9 +2390,9 @@ export class ExpressionDowel extends ExpressionFunction {
       if (i === stops.length - 1 && !isCircuit) {
         const plane = new Plane(stops[i].position, to);
         const base = positions.length - nsides;
-        intersectPlaneAndRescale(plane, to, stops[i - 1].position, stops[i].radii[0], base);
-        for (let ringIndex = 1; ringIndex < stops[i].radii.length; ++ringIndex) {
-          intersectPlaneAndRescale(plane, to, stops[i - 1].position, stops[i].radii[ringIndex], base);
+        intersectPlaneAndRescale(plane, to, stops[i - 1].position, stops[i].variables[0], base);
+        for (let ringIndex = 1; ringIndex < stops[i].variables.length; ++ringIndex) {
+          intersectPlaneAndRescale(plane, to, stops[i - 1].position, stops[i].variables[ringIndex], base);
         }
       }
 
@@ -2400,12 +2401,12 @@ export class ExpressionDowel extends ExpressionFunction {
         const radians = Math.acos(from.dot(to));
         const degrees = MathUtilities.toDegrees(radians);
 
-        if (degrees <= sharpness || stops[i].radii.length > 1) {
+        if (degrees <= sharpness || stops[i].variables.length > 1) {
           // Cast rays from the preceding ring into a perpendicular plane.
           const perpendicularPlane = new Plane(stops[i].position, to);
           const vertexZeroIndex = positions.length - nsides;
-          for (let radius of stops[i].radii) {
-            intersectPlaneAndRescale(perpendicularPlane, to, stops[i - 1].position, radius, vertexZeroIndex);
+          for (let variables of stops[i].variables) {
+            intersectPlaneAndRescale(perpendicularPlane, to, stops[i - 1].position, variables, vertexZeroIndex);
           }
 
           const tangent = to.add(from).normalize();
@@ -2418,10 +2419,10 @@ export class ExpressionDowel extends ExpressionFunction {
         // Round out bend in incremental stages.
         else {
           const supplementaryRadians = Math.PI - radians;
-          const reach = stops[i].radii[0] / Math.sin(supplementaryRadians * 0.5);
+          const reach = stops[i].variables[0].radius / Math.sin(supplementaryRadians * 0.5);
           const pivot = to.inverse().add(from).normalize().scalarMultiply(reach).add(stops[i].position);
           const plane = new Plane(pivot, to);
-          intersectPlaneAndRescale(plane, to, stops[i - 1].position, stops[i].radii[0], positions.length - nsides);
+          intersectPlaneAndRescale(plane, to, stops[i - 1].position, stops[i].variables[0], positions.length - nsides);
 
           const axis = to.cross(from).normalize();
           const nwedges = Math.ceil(degrees / sharpness);
@@ -2434,6 +2435,7 @@ export class ExpressionDowel extends ExpressionFunction {
               const from = positions[positions.length - nsides];
               const to = rotater.multiplyVector(positions[positions.length - nsides].toVector4(1)).toVector3();
               positions.push(to);
+              colors.push(stops[i].variables[0].color);
               issueFace(base, radialIndex);
             }
           }
@@ -2452,6 +2454,10 @@ export class ExpressionDowel extends ExpressionFunction {
     if (!isCircuit) {
       positions.push(stops[0].position);
       positions.push(stops[stops.length - 1].position);
+      colors.push(stops[0].variables[0].color);
+      const lastStop = stops[stops.length - 1];
+      const lastVariables = lastStop.variables[lastStop.variables.length - 1];
+      colors.push(lastVariables.color);
       for (let i = 0; i < nsides; ++i) {
         faces.push([positions.length - 2, (i + 1) % nsides, i]);
         faces.push([positions.length - 1, positions.length - 2 - nsides + i, positions.length - 2 - nsides + (i + 1) % nsides]);
@@ -2459,6 +2465,7 @@ export class ExpressionDowel extends ExpressionFunction {
     }
 
     const mesh = new Trimesh(positions, faces);
+    mesh.setColors(colors);
     env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
   }
 }
@@ -2470,7 +2477,7 @@ export class ExpressionRevolve extends ExpressionFunction {
     const nsides = env.variables.nsides.value;
     const degrees = env.variables.degrees.value;
     const axis = env.variables.axis;
-    const pivot = env.variables.pivot;
+    const origin = env.variables.origin;
     const name = env.variables.name.value;
 
     if (degrees < -360 || degrees > 360) {
@@ -2488,25 +2495,26 @@ export class ExpressionRevolve extends ExpressionFunction {
     const degreesDelta = degrees / nsides;
 
     const axis3 = new Vector3(axis.value[0].value, axis.value[1].value, axis.value[2].value).normalize();
-    const pivot3 = new Vector3(pivot.value[0].value, pivot.value[1].value, pivot.value[2].value);
-    const rotater = Matrix4.rotateAround(axis3, degreesDelta, pivot3);
+    const origin3 = new Vector3(origin.value[0].value, origin.value[1].value, origin.value[2].value);
+    const rotater = Matrix4.rotateAround(axis3, degreesDelta, origin3);
     const isRotationClosed = Math.abs(Math.abs(degrees) - 360) < 1e-6;
     const ringCount = isRotationClosed ? nsides : nsides + 1;
 
-    let vertices = polyline.vertices.map(vertex => vertex.position);
+    const vertices = [...polyline.vertices];
     if (isCrossSectionClosed) {
       vertices.splice(vertices.length - 1, 1);
     }
 
     let delta = new Vector3(0, 0, 0);
     for (let i = 0; delta.magnitude < 1e-6 && i < vertices.length; ++i) {
-      const rrr = Matrix4.rotate(axis3, degrees < 0 ? -10 : 10, pivot3);
-      const rotatedPosition = rrr.multiplyVector(vertices[i].toVector4(1)).toVector3();
-      delta = rotatedPosition.subtract(vertices[i]);
+      const rrr = Matrix4.rotate(axis3, degrees < 0 ? -10 : 10, origin3);
+      const rotatedPosition = rrr.multiplyVector(vertices[i].position.toVector4(1)).toVector3();
+      delta = rotatedPosition.subtract(vertices[i].position);
     }
 
-    const isCounterClockwise = Polyline.isCounterClockwise(Polyline.flatten(vertices));
-    const normal = Polyline.normal(vertices);
+    const vertexPositions = vertices.map(vertex => vertex.position);
+    const isCounterClockwise = Polyline.isCounterClockwise(Polyline.flatten(vertexPositions));
+    const normal = Polyline.normal(vertexPositions);
     const normalDotDirection = normal.dot(delta);
 
     if (normalDotDirection < 0) {
@@ -2514,10 +2522,12 @@ export class ExpressionRevolve extends ExpressionFunction {
     }
 
     const positions = new Array(vertices.length * ringCount);
+    const colors = new Array(positions.length);
     for (let i = 0; i < vertices.length; ++i) {
-      let position = vertices[i];
+      let {position, color} = vertices[i];
       for (let ringIndex = 0; ringIndex < ringCount; ++ringIndex) {
         positions[ringIndex * vertices.length + i] = position;
+        colors[ringIndex * vertices.length + i] = color;
         position = rotater.multiplyVector(position.toVector4(1)).toVector3();
       }
     }
@@ -2551,12 +2561,15 @@ export class ExpressionRevolve extends ExpressionFunction {
 
       faces.push(...baseCap.faces.map(face => face.map(i => i + positions.length)));
       positions.push(...baseCap.positions);
+      colors.push(...vertices.map(vertex => vertex.color));
 
       faces.push(...offsetCap.faces.map(face => face.map(i => i + positions.length)));
       positions.push(...offsetCap.positions);
+      colors.push(...vertices.map(vertex => vertex.color));
     }
 
     const mesh = new Trimesh(positions, faces);
+    mesh.setColors(colors);
     env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
   }
 }
@@ -2616,18 +2629,21 @@ export class ExpressionExtrude extends ExpressionFunction {
 
     const n = vertices.length;
     const positions = [];
+    const colors = [];
     const faces = [];
 
     const axis3 = new Vector3(axis.value[0].value, axis.value[1].value, axis.value[2].value);
     const offset = axis3.normalize().scalarMultiply(distance);
 
     positions.push(...vertices.map(vertex => vertex.position));
+    colors.push(...vertices.map(vertex => vertex.color));
 
     const normal = Polyline.normal(positions);
     const normalDotAxis = normal.dot(offset);
     const isCounterClockwise = Polyline.isCounterClockwise(Polyline.flatten(positions));
 
     positions.push(...positions.map(position => position.add(offset)));
+    colors.push(...vertices.map(vertex => vertex.color));
 
     for (let i = 0; i < n; ++i) {
       faces.push([i, (i + 1) % n, i + n]);
@@ -2656,12 +2672,15 @@ export class ExpressionExtrude extends ExpressionFunction {
 
       faces.push(...baseCap.faces.map(face => face.map(i => i + positions.length)));
       positions.push(...baseCap.positions);
+      colors.push(...vertices.map(vertex => vertex.color));
 
       faces.push(...offsetCap.faces.map(face => face.map(i => i + positions.length)));
       positions.push(...offsetCap.positions);
+      colors.push(...vertices.map(vertex => vertex.color));
     }
 
     const mesh = new Trimesh(positions, faces);
+    mesh.setColors(colors);
     env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
   }
 }
@@ -2685,6 +2704,7 @@ export class ExpressionPolygon extends ExpressionFunction {
 
     const positions = vertices.map(vertex => vertex.position);
     const mesh = Trimesh.triangulate(positions);
+    mesh.setColors(vertices.map(vertex => vertex.color));
 
     if (isFlipped) {
       mesh.reverseWinding();

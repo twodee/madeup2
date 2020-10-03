@@ -365,7 +365,7 @@ function startInterpreting(renderMode, isErrorDelayed) {
     }
   });
 
-  const hasWorker = true;
+  const hasWorker = false;
   if (hasWorker) {
     interpreterWorker.postMessage({
       command: 'interpret',
