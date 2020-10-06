@@ -1042,7 +1042,7 @@ export class ExpressionFunctionCall extends Expression {
     let callEnvironment = Environment.create(env);
     for (let [identifier, actualExpression] of Object.entries(this.actuals)) {
       if (!f.formals.find(formal => formal.name === identifier)) {
-        unknownParameters.push(identifier);
+        unknownParameters.push({identifier: identifier, isAutoscopic: !actualExpression});
       } else {
         providedParameters.push(identifier);
         let value;
@@ -1056,7 +1056,7 @@ export class ExpressionFunctionCall extends Expression {
     }
 
     if (unknownParameters.length > 0) {
-      throw new LocatedException(this.where, `I didn't expect function <var>${this.nameToken.source}</var> to be provided a parameter named <var>${unknownParameters[0]}</var>. I'm not sure what to do with that parameter.\n\nPerhaps the documentation might help.`, {documentation: f.documentation, providedParameters});
+      throw new LocatedException(this.where, `I didn't expect function <var>${this.nameToken.source}</var> to be provided a parameter named <var>${unknownParameters[0].identifier}</var>. ${unknownParameters[0].isAutoscopic && f.formals.length > 0 ? "Perhaps you need to explicitly name it?" : "I'm not sure what to do with that parameter."}\n\nCheck the documentation panel for a description of the parameters.`, {documentation: f.documentation, providedParameters});
     }
 
     // Look for any missing formals. Supply implicit or default if possible.
@@ -1108,7 +1108,7 @@ export class ExpressionMemberFunctionCall extends ExpressionFunctionCall {
     let hostValue = this.host.evaluate(env);
 
     if (!hostValue.hasFunction(this.nameToken.source)) {
-      throw new LocatedException(this.where, `I've not heard of any method named "${this.nameToken.source}".`);
+      throw new LocatedException(this.where, `I've not heard of any method named <var>${this.nameToken.source}</var>.`);
     }
 
     return hostValue.getFunction(this.nameToken.source);
@@ -1260,7 +1260,23 @@ export class ExpressionSubscript extends Expression {
 
 // --------------------------------------------------------------------------- 
 
-export class ExpressionVectorAdd extends Expression {
+// export class ExpressionVectorAdd extends Expression {
+  // static precedence = Precedence.Property;
+
+  // constructor(instance, unevaluated) {
+    // super(undefined, unevaluated);
+    // this.instance = instance;
+  // }
+
+  // evaluate(env, callExpression) {
+    // let item = env.get('item');
+    // return this.instance.insert(item);
+  // }
+// }
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionVectorPush extends Expression {
   static precedence = Precedence.Property;
 
   constructor(instance, unevaluated) {
@@ -1269,8 +1285,24 @@ export class ExpressionVectorAdd extends Expression {
   }
 
   evaluate(env, callExpression) {
-    let item = env.get('item');
-    return this.instance.insert(item);
+    let item = env.variables.item;
+    return this.instance.push(item);
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionVectorPop extends Expression {
+  static precedence = Precedence.Property;
+
+  constructor(instance, unevaluated) {
+    super(undefined, unevaluated);
+    this.instance = instance;
+  }
+
+  evaluate(env, callExpression) {
+    let item = this.instance.pop();
+    return item;
   }
 }
 
@@ -1753,10 +1785,14 @@ export class ExpressionVector extends ExpressionData {
       size: new FunctionDefinition('size', '', [], new ExpressionVectorSize(this)),
       magnitude: new FunctionDefinition('magnitude', '', [], new ExpressionVectorMagnitude(this)),
       toCartesian: new FunctionDefinition('toCartesian', '', [], new ExpressionVectorToCartesian(this)),
-      add: new FunctionDefinition('add', '', [new FormalParameter('item')], new ExpressionVectorAdd(this)),
+      // add: new FunctionDefinition('add', '', [new FormalParameter('item')], new ExpressionVectorAdd(this)),
       rotateAround: new FunctionDefinition('rotateAround', '', [new FormalParameter('pivot'), new FormalParameter('degrees')], new ExpressionVectorRotateAround(this)),
       rotate: new FunctionDefinition('rotate', '', [new FormalParameter('degrees')], new ExpressionVectorRotate(this)),
       rotate90: new FunctionDefinition('rotate90', '', [], new ExpressionVectorRotate90(this)),
+      push: new FunctionDefinition('push', 'Add an element to the end of this vector.', [
+        new FormalParameter('item', 'The element to add.'),
+      ], new ExpressionVectorPush(this)),
+      pop: new FunctionDefinition('pop', 'Remove the last element from this vector.', [], new ExpressionVectorPop(this)),
     };
   }
 
@@ -1792,8 +1828,12 @@ export class ExpressionVector extends ExpressionData {
     return new ExpressionVector(values, this.where?.clone());
   }
 
-  insert(item) {
+  push(item) {
     this.value.push(item);
+  }
+
+  pop() {
+    return this.value.pop();
   }
 
   map(transform) {
@@ -2270,6 +2310,10 @@ export class ExpressionDowel extends ExpressionFunction {
         colors.push(variables.color);
         issueFace(vertexZeroIndex, i);
       }
+    }
+
+    if (vertices.length < 2) {
+      throw new MessagedException("I expected this dowel to have at least two vertices.");
     }
 
     // Bundle all the coincident stops together to make traversal simpler. Each

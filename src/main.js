@@ -550,9 +550,11 @@ function initialize() {
 // --------------------------------------------------------------------------- 
 
 function save() {
-  localStorage.setItem('src', editor.getValue());
-  isSaved = true;
-  syncTitle();
+  if (!isEmbedded) {
+    localStorage.setItem('src', editor.getValue());
+    isSaved = true;
+    syncTitle();
+  }
 }
 
 // --------------------------------------------------------------------------- 
@@ -580,9 +582,13 @@ function initializeDOM() {
 
   new Messager(document.getElementById('messager'), document, highlight);
 
-  if (!source0 && localStorage.getItem('src') !== null) {
+  // Set the source code before the listener is attached.
+  if (source0) {
+    editor.setValue(source0, 1);
+  } else if (!isEmbedded && localStorage.getItem('src') !== null) {
     editor.setValue(localStorage.getItem('src'), 1);
   }
+
   editor.getSession().on('change', onSourceChanged);
   editor.getSession().setMode("ace/mode/madeup");
   editor.getSession().selection.on('changeCursor', onChangeCursor);
@@ -612,10 +618,6 @@ function initializeDOM() {
     left.style.width = '300px';
     messagerContainer.style.height = '50px';
     editor.resize();
-  }
-
-  if (source0) {
-    editor.setValue(source0, 1);
   }
 
   const generateHeightResizer = resizer => {
@@ -649,7 +651,9 @@ function initializeDOM() {
       parentPanel.children[i - 1].style['width'] = `${newWidth}px`;
 
       editor.resize();
-      localStorage.setItem('left-width', parentPanel.children[i - 1].style.width);
+      if (!isEmbedded) {
+        localStorage.setItem('left-width', parentPanel.children[i - 1].style.width);
+      }
       resizeWindow();
 
       e.preventDefault();
@@ -677,7 +681,9 @@ function initializeDOM() {
       const parentPanel = resizer.parentNode;
       const bounds = parentPanel.children[i + 1].getBoundingClientRect();
 
-      localStorage.setItem('right-width', parentPanel.children[i + 1].style.width);
+      if (!isEmbedded) {
+        localStorage.setItem('right-width', parentPanel.children[i + 1].style.width);
+      }
       resizeWindow();
   
       const newWidth = bounds.right - e.clientX + 4;
@@ -723,7 +729,9 @@ function initializeDOM() {
   const targetMillis = 300;
 
   openPanelButton.addEventListener('click', () => {
-    localStorage.setItem('is-panel-open', true);
+    if (!isEmbedded) {
+      localStorage.setItem('is-panel-open', true);
+    }
     openPanelButton.style.display = 'none';
 
     panel.style.display = 'flex';
@@ -760,7 +768,9 @@ function initializeDOM() {
   });
 
   closePanelButton.addEventListener('click', () => {
-    localStorage.setItem('is-panel-open', false);
+    if (!isEmbedded) {
+      localStorage.setItem('is-panel-open', false);
+    }
     closePanelButton.style.display = 'none';
     middleRightResizer.style.display = 'none';
 
@@ -823,6 +833,10 @@ function initializeDOM() {
   canvas.addEventListener('mousedown', mouseDown);
   canvas.addEventListener('mouseup', mouseUp);
   canvas.addEventListener('wheel', mouseWheel, {passive: true});
+
+  document.addEventListener('wheel', event => {
+    event.preventDefault();
+  }, {passive: false});
 
   document.addEventListener('keydown', event => {
     if ((event.ctrlKey || event.metaKey) && event.key === 's') {
@@ -1416,7 +1430,7 @@ function reset() {
 
 // --------------------------------------------------------------------------- 
 
-window.addEventListener('DOMContentLoaded', initialize);
+initialize();
 
 // --------------------------------------------------------------------------- 
 

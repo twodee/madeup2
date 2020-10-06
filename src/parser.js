@@ -241,6 +241,7 @@ export function parse(tokens) {
 
   function expressionMember() {
     let base = atom();
+
     while (has(TokenType.Dot) || has(TokenType.Distribute) || has(TokenType.LeftSquareBracket)) {
       if (has(TokenType.Dot)) {
         let dotToken = consume(); // eat .
@@ -249,28 +250,11 @@ export function parse(tokens) {
           throw new LocatedException(dotToken.where, `expected ID`);
         }
 
-        let nameToken = consume();
-
-        if (has(TokenType.LeftParenthesis)) {
-          consume(); // eat (
-
-          let actuals = [];
-          if (isFirstOfExpression()) {
-            actuals.push(expression());
-            while (has(TokenType.Comma) && isFirstOfExpression(1)) {
-              consume(); // eat ,
-              actuals.push(expression());
-            }
-          }
-
-          let sourceEnd = tokens[i].where;
-          if (!has(TokenType.RightParenthesis)) {
-            throw new LocatedException(SourceLocation.span(sourceStart, sourceEnd), `I expected a right parenthesis to close the function call, but I encountered "${tokens[i].source}" (${tokens[i].type}) instead.`);
-          }
-          consume();
-
+        if (has(TokenType.LeftParenthesis, 1)) {
+          let {nameToken, actuals, sourceEnd} = parseCall(base.where);
           base = new ExpressionMemberFunctionCall(base, nameToken, actuals, SourceLocation.span(base.where, sourceEnd));
         } else {
+          let nameToken = consume();
           base = new ExpressionMemberIdentifier(base, nameToken, SourceLocation.span(base.where, nameToken.where));
         }
       } else {
@@ -283,6 +267,7 @@ export function parse(tokens) {
         base = new ExpressionSubscript(base, index, SourceLocation.span(base.where, rightBracketToken.where));
       }
     }
+
     return base;
   }
 
@@ -608,122 +593,7 @@ export function parse(tokens) {
       return new ExpressionVector(elements, SourceLocation.span(sourceStart, sourceEnd));
     } else if (has(TokenType.Identifier) && has(TokenType.LeftParenthesis, 1)) {
       let sourceStart = tokens[i].where;
-
-      let nameToken = consume();
-      const leftToken = consume(); // eat (
-
-      // Allow linebreak followed by indentation.
-      let hasLinebreaks = false;
-      if (has(TokenType.Linebreak)) {
-        consume();
-        if (has(TokenType.Indentation)) {
-          if (indents[indents.length - 1] < tokens[i].source.length) {
-            indents.push(tokens[i].source.length);
-            hasLinebreaks = true;
-            consume();
-          } else {
-            throw new LocatedException(tokens[i].where, 'I expected the parameters to be indented one level.');
-          }
-        } else {
-          throw new LocatedException(leftToken.where, 'I expected the parameters to be indented one level.');
-        }
-      }
-
-      const actuals = {};
-      while (!has(TokenType.RightParenthesis)) {
-        if (has(TokenType.LeftSquareBracket)) {
-          const leftBracketToken = consume();
-
-          const identifiers = [];
-          while (!has(TokenType.RightSquareBracket)) {
-            if (!has(TokenType.Identifier)) {
-              throw new LocatedException(tokens[i].where, 'I expected an identifier.');
-            }
-
-            // Grab identifier.
-            identifiers.push(consume());
-
-            if (has(TokenType.Comma)) {
-              consume();
-            } else if (!has(TokenType.RightSquareBracket) && !has(TokenType.Identifier)) {
-              throw new LocatedException(tokens[i].where, `I didn't expect ${token[i].source}.`);
-            }
-          }
-
-          consume(); // eat ]
-
-          if (!has(TokenType.Assign)) {
-            throw new LocatedException(tokens[i].where, 'I expected =.');
-          }
-
-          consume(); // eat =
-          const e = expression();
-
-          for (let [i, identifier] of identifiers.entries()) {
-            actuals[identifier.source] = new ExpressionSubscript(e, new ExpressionInteger(i), SourceLocation.span(leftBracketToken, e));
-          }
-        } else if (has(TokenType.Identifier)) {
-          const identifier = consume();
-          
-          if (has(TokenType.Assign)) {
-            consume(); // eat =
-            actuals[identifier.source] = expression();
-          } else {
-            actuals[identifier.source] = undefined;
-          }
-        } else {
-          throw new LocatedException(tokens[i].where, 'I expected the parameters to be named.');
-        }
-
-
-        if (!has(TokenType.RightParenthesis)) {
-          if (has(TokenType.Comma)) {
-            consume(); // eat ,
-
-            if (has(TokenType.Linebreak)) {
-              if (hasLinebreaks) {
-                consume(); // eat break
-                if (has(TokenType.Indentation)) {
-                  if (indents[indents.length - 1] === tokens[i].source.length) {
-                    consume();
-                  } else {
-                    throw new LocatedException(tokens[i].where, 'I expected all of the parameters to have the same level of indentation. But this element has a different indentation.');
-                  }
-                }
-              } else {
-                throw new LocatedException(tokens[i].where, 'I expected no linebreaks in this call because there was no linebreak after the opening (.');
-              }
-            }
-          } else if (has(TokenType.Linebreak)) {
-            if (hasLinebreaks) {
-              consume();
-              if (has(TokenType.Indentation) && has(TokenType.RightParenthesis, 1)) {
-                indents.pop();
-                if (indents[indents.length - 1] === tokens[i].source.length) {
-                  consume();
-                } else {
-                  consume();
-                  throw new LocatedException(tokens[i].where, 'I expected the call\'s closing line to have the same indentation as its opening line.');
-                }
-              } else {
-                throw new LocatedException(tokens[i].where, 'I expected the call to be closed with ).');
-              }
-            } else {
-              throw new LocatedException(tokens[i].where, 'I expected no linebreaks in this call because there was no linebreak after the opening (.');
-            }
-          } else {
-            throw new LocatedException(tokens[i].where, 'I expected a comma between parameters.');
-          }
-        }
-      }
-
-      let sourceEnd = tokens[i].where;
-      if (has(TokenType.RightParenthesis)) {
-        consume();
-      } else {
-        throw new LocatedException(SourceLocation.span(sourceStart, sourceEnd), `I expected a right parenthesis to close the function call, but I encountered "${tokens[i].source}" (${tokens[i].type}) instead.`);
-      }
-
+      let {nameToken, actuals, sourceEnd} = parseCall(sourceStart);
       return new ExpressionFunctionCall(nameToken, actuals, SourceLocation.span(sourceStart, sourceEnd));
     } else if (has(TokenType.Repeat)) {
       let sourceStart = tokens[i].where;
@@ -752,6 +622,125 @@ export function parse(tokens) {
         throw new LocatedException(tokens[i].where, `I don't know what "${tokens[i].source}" means here.`);
       }
     }
+  }
+
+  function parseCall(sourceStart) {
+    let nameToken = consume();
+    const leftToken = consume(); // eat (
+
+    // Allow linebreak followed by indentation.
+    let hasLinebreaks = false;
+    if (has(TokenType.Linebreak)) {
+      consume(); // eat \n
+      if (has(TokenType.Indentation)) {
+        if (indents[indents.length - 1] < tokens[i].source.length) {
+          indents.push(tokens[i].source.length);
+          hasLinebreaks = true;
+          consume();
+        } else {
+          throw new LocatedException(tokens[i].where, 'I expected the parameters to be indented one level.');
+        }
+      } else {
+        throw new LocatedException(leftToken.where, 'I expected the parameters to be indented one level.');
+      }
+    }
+
+    const actuals = {};
+    while (!has(TokenType.RightParenthesis)) {
+      if (has(TokenType.LeftSquareBracket)) {
+        const leftBracketToken = consume();
+
+        const identifiers = [];
+        while (!has(TokenType.RightSquareBracket)) {
+          if (!has(TokenType.Identifier)) {
+            throw new LocatedException(tokens[i].where, 'I expected an identifier.');
+          }
+
+          // Grab identifier.
+          identifiers.push(consume());
+
+          if (has(TokenType.Comma)) {
+            consume();
+          } else if (!has(TokenType.RightSquareBracket) && !has(TokenType.Identifier)) {
+            throw new LocatedException(tokens[i].where, `I didn't expect ${token[i].source}.`);
+          }
+        }
+
+        consume(); // eat ]
+
+        if (!has(TokenType.Assign)) {
+          throw new LocatedException(tokens[i].where, 'I expected =.');
+        }
+
+        consume(); // eat =
+        const e = expression();
+
+        for (let [i, identifier] of identifiers.entries()) {
+          actuals[identifier.source] = new ExpressionSubscript(e, new ExpressionInteger(i), SourceLocation.span(leftBracketToken, e));
+        }
+      } else if (has(TokenType.Identifier)) {
+        const identifier = consume();
+        
+        if (has(TokenType.Assign)) {
+          consume(); // eat =
+          actuals[identifier.source] = expression();
+        } else {
+          actuals[identifier.source] = undefined;
+        }
+      } else {
+        throw new LocatedException(tokens[i].where, 'I expected the parameters to be named.');
+      }
+
+
+      if (!has(TokenType.RightParenthesis)) {
+        if (has(TokenType.Comma)) {
+          consume(); // eat ,
+
+          if (has(TokenType.Linebreak)) {
+            if (hasLinebreaks) {
+              consume(); // eat break
+              if (has(TokenType.Indentation)) {
+                if (indents[indents.length - 1] === tokens[i].source.length) {
+                  consume();
+                } else {
+                  throw new LocatedException(tokens[i].where, 'I expected all of the parameters to have the same level of indentation. But this element has a different indentation.');
+                }
+              }
+            } else {
+              throw new LocatedException(tokens[i].where, 'I expected no linebreaks in this call because there was no linebreak after the opening (.');
+            }
+          }
+        } else if (has(TokenType.Linebreak)) {
+          if (hasLinebreaks) {
+            consume();
+            if (has(TokenType.Indentation) && has(TokenType.RightParenthesis, 1)) {
+              indents.pop();
+              if (indents[indents.length - 1] === tokens[i].source.length) {
+                consume();
+              } else {
+                consume();
+                throw new LocatedException(tokens[i].where, 'I expected the call\'s closing line to have the same indentation as its opening line.');
+              }
+            } else {
+              throw new LocatedException(tokens[i].where, 'I expected the call to be closed with ).');
+            }
+          } else {
+            throw new LocatedException(tokens[i].where, 'I expected no linebreaks in this call because there was no linebreak after the opening (.');
+          }
+        } else {
+          throw new LocatedException(tokens[i].where, 'I expected a comma between parameters.');
+        }
+      }
+    }
+
+    let sourceEnd = tokens[i].where;
+    if (has(TokenType.RightParenthesis)) {
+      consume();
+    } else {
+      throw new LocatedException(SourceLocation.span(sourceStart, sourceEnd), `I expected a right parenthesis to close the function call, but I encountered "${tokens[i].source}" (${tokens[i].type}) instead.`);
+    }
+
+    return {nameToken, actuals, sourceEnd};
   }
 
   let ast = program();
