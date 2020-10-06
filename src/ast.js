@@ -904,7 +904,7 @@ export class ExpressionIdentifier extends Expression {
     if (value) {
       return value;
     } else {
-      throw new LocatedException(this.nameToken.where, `I'm sorry, but I've never heard of this "${this.nameToken.source}" before.`);
+      throw new LocatedException(this.nameToken.where, `I'm sorry, but I've never heard of <var>${this.nameToken.source}</var> before.`);
     }
   }
 
@@ -2085,7 +2085,6 @@ export class ExpressionVector extends ExpressionData {
       }
       return new ExpressionVector(result);
     } else {
-      console.trace('asdf');
       throw 'bad vector subtract';
     }
   }
@@ -2264,7 +2263,7 @@ export class ExpressionHome extends ExpressionFunction {
     const polyline = env.root.currentPolyline;
 
     if (!polyline || polyline.vertices.length === 0) {
-      throw new LocatedException(this.where, "I expected home to be called on a non-empty path.");
+      throw new MessagedException("I expected home to be called on a non-empty path.");
     }
 
     const vertex = polyline.vertices[0];
