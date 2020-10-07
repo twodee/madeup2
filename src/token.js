@@ -17,6 +17,7 @@ export let TokenType = Object.freeze({
   ForwardSlash: 'ForwardSlash',
   Identifier: 'Identifier',
   If: 'If',
+  Of: 'Of',
   In: 'In',
   Indentation: 'Indentation',
   Integer: 'Integer',

@@ -21,6 +21,7 @@ import {
   ExpressionInteger,
   ExpressionDowel,
   ExpressionMesh,
+  ExpressionMold,
   ExpressionMoveto,
   ExpressionMove,
   ExpressionMultiply,
@@ -32,6 +33,7 @@ import {
   ExpressionReal,
   ExpressionRevolve,
   ExpressionRoll,
+  ExpressionRotate,
   ExpressionSeed,
   ExpressionSine,
   ExpressionSpheres,
@@ -39,6 +41,7 @@ import {
   ExpressionStay,
   ExpressionString,
   ExpressionSubtract,
+  ExpressionTable,
   ExpressionTangent,
   ExpressionUnit,
   ExpressionVector,
@@ -84,6 +87,24 @@ export const Builtins = (function() {
       new FormalParameter('sharpness', 'The maximum angle of the bends in the dowel. Bends greater than this value will be rounded.', new ExpressionReal(360)),
       nameParameter,
     ], new ExpressionDowel()),
+
+    table: new FunctionDefinition('table', 'Thicken the path into a solid dowel whose cross section is a regular polygon.', [
+      new FormalParameter('rows', 'The number of the sides. For example, 4 yields a square dowel.'),
+      nameParameter,
+    ], new ExpressionTable()),
+
+    mold: new FunctionDefinition('mold', 'Extract the current path into a reusable form.', [], new ExpressionMold()),
+
+    rotate: new FunctionDefinition('rotate', 'Rotate the given path.', [
+      new FormalParameter('path', 'The path to rotate.'),
+      new FormalParameter('degrees', 'The number of degrees to rotate the path.'),
+      new FormalParameter('axis', 'The axis about which to rotate the path.'),
+      new FormalParameter('origin', 'A point lying on the axis of rotation.', new ExpressionVector([
+        new ExpressionReal(0),
+        new ExpressionReal(0),
+        new ExpressionReal(0),
+      ])),
+    ], new ExpressionRotate()),
 
     revolve: new FunctionDefinition('revolve', 'Revolve the path around an axis to produce a solid.', [
       new FormalParameter('degrees', 'The number of degrees to revolve the path.'),

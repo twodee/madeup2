@@ -1040,7 +1040,9 @@ export class ExpressionFunctionCall extends Expression {
     let unknownParameters = [];
 
     let callEnvironment = Environment.create(env);
-    for (let [identifier, actualExpression] of Object.entries(this.actuals)) {
+    console.log("this.actuals:", this.actuals);
+    for (let [identifier, actual] of Object.entries(this.actuals)) {
+      const actualExpression = actual.expression;
       if (!f.formals.find(formal => formal.name === identifier)) {
         unknownParameters.push({identifier: identifier, isAutoscopic: !actualExpression});
       } else {
@@ -1049,6 +1051,9 @@ export class ExpressionFunctionCall extends Expression {
         if (actualExpression) {
           value = actualExpression.evaluate(env);
         } else {
+          if (!env.ownsVariable(identifier)) {
+            throw new LocatedException(actual.where, `I expected <var>${identifier}</var> to be defined. But it's not.\n\nPerhaps the documentation might help.`, {documentation: f.documentation, providedParameters});
+          }
           value = env.variables[identifier];
         }
         callEnvironment.bind(identifier, value);
@@ -1203,7 +1208,31 @@ export class ExpressionFor extends Expression {
     let by = this.by.evaluate(env).value;
 
     for (let i = start; i < stop; i += by) {
-      new ExpressionAssignment(this.i, new ExpressionInteger(i), true).evaluate(env);
+      new ExpressionAssignment(this.i, new ExpressionInteger(i)).evaluate(env);
+      this.body.evaluate(env);
+    }
+
+    // TODO return?
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionForOf extends Expression {
+  static precedence = Precedence.Atom;
+
+  constructor(iterator, vector, body, where, unevaluated) {
+    super(where, unevaluated);
+    this.iterator = iterator;
+    this.vector = vector;
+    this.body = body;
+  }
+
+  evaluate(env) {
+    let values = this.vector.evaluate(env).value;
+
+    for (let i = 0; i < values.length; ++i) {
+      new ExpressionAssignment(this.iterator, values[i]).evaluate(env);
       this.body.evaluate(env);
     }
 
@@ -2756,6 +2785,84 @@ export class ExpressionPolygon extends ExpressionFunction {
     env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
   }
 }
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionPolyline extends ExpressionData {
+  static type = 'polyline';
+  static article = 'a';
+
+  constructor(value, where) {
+    super(value, where);
+  }
+
+  toPretty() {
+    return this.value.vertices.map(vertex => {
+      return `{position: ${vertex.position.toString()}, radius: ${vertex.radius}, color: ${vertex.color.toString()}}`;
+    }).join("\n");
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionMold extends ExpressionFunction {
+  evaluate(env) {
+    const polyline = env.root.seal();
+    return new ExpressionPolyline(polyline);
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionRotate extends ExpressionFunction {
+  evaluate(env) {
+    const polyline = env.variables.path.value;
+    const degrees = env.variables.degrees.value;
+    const axis = env.variables.axis;
+    const origin = env.variables.origin;
+    const axis3 = new Vector3(axis.value[0].value, axis.value[1].value, axis.value[2].value).normalize();
+    const origin3 = new Vector3(origin.value[0].value, origin.value[1].value, origin.value[2].value);
+
+    const rotater = Matrix4.rotateAround(axis3, degrees, origin3);
+
+    for (let vertex of polyline.vertices) {
+      const position = rotater.multiplyVector(vertex.position.toVector4(1)).toVector3();
+      env.root.currentPolyline.turtle.relocate(position);
+      env.root.visit({
+        radius: vertex.radius,
+        color: vertex.color,
+      });
+    }
+
+    return new ExpressionPolyline(env.root.seal());
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionTable extends ExpressionFunction {
+  evaluate(env) {
+    const polylines = env.variables.rows.value.map(ep => ep.value);
+
+    const positions = polylines.flatMap(polyline => polyline.vertices.map(vertex => vertex.position));
+    const colors = polylines.flatMap(polyline => polyline.vertices.map(vertex => vertex.color));
+
+    const faces = [];
+    for (let ringIndex = 0; ringIndex < polylines.length - 1; ++ringIndex) {
+      const polyline = polylines[ringIndex];
+      const base = ringIndex * polyline.vertices.length;
+      for (let i = 0; i < polyline.vertices.length - 1; ++i) {
+        faces.push([base + i, base + i + polyline.vertices.length, base + i + 1]);
+        faces.push([base + i + 1, base + i + polyline.vertices.length, base + i + polyline.vertices.length + 1]);
+      }
+    }
+
+    const mesh = new Trimesh(positions, faces);
+    mesh.setColors(colors);
+    env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
+  }
+}
+
 
 // --------------------------------------------------------------------------- 
 

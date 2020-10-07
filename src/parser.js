@@ -20,6 +20,7 @@ import {
   ExpressionCharacter,
   ExpressionDivide,
   ExpressionFor,
+  ExpressionForOf,
   ExpressionFunctionCall,
   ExpressionFunctionDefinition,
   ExpressionMore,
@@ -476,43 +477,54 @@ export function parse(tokens) {
         let stop;
         let by;
         
-        if (has(TokenType.In)) {
-          consume(); // eat in
-          start = expression();
-          if (has(TokenType.Range)) {
-            consume(); // eat ..
+        if (has(TokenType.In) || has(TokenType.To) || has(TokenType.Through)) {
+          if (has(TokenType.In)) {
+            consume(); // eat in
+            start = expression();
+            if (has(TokenType.Range)) {
+              consume(); // eat ..
+              stop = expression();
+              stop = new ExpressionAdd(new ExpressionInteger(1), stop);
+            } else {
+              throw new LocatedException(SourceLocation.span(sourceStart, start.where), 'I expected the range operator .. in a for-in loop.');
+            }
+          } else if (has(TokenType.To)) {
+            consume(); // eat to
+            start = new ExpressionInteger(0);
+            stop = expression();
+          } else {
+            consume(); // eat through
+            start = new ExpressionInteger(0);
             stop = expression();
             stop = new ExpressionAdd(new ExpressionInteger(1), stop);
-          } else {
-            throw new LocatedException(SourceLocation.span(sourceStart, start.where), 'I expected the range operator .. in a for-in loop.');
           }
-        } else if (has(TokenType.To)) {
-          consume(); // eat to
-          start = new ExpressionInteger(0);
-          stop = expression();
-        } else if (has(TokenType.Through)) {
-          consume(); // eat through
-          start = new ExpressionInteger(0);
-          stop = expression();
-          stop = new ExpressionAdd(new ExpressionInteger(1), stop);
+
+          if (has(TokenType.By)) {
+            consume(); // eat by
+            by = expression();
+          } else {
+            by = new ExpressionInteger(1);
+          }
+
+          if (!has(TokenType.Linebreak)) {
+            throw new LocatedException(SourceLocation.span(sourceStart, stop.where), 'I expected a linebreak after this loop\'s range.');
+          }
+          consume(); // eat linebreak
+          let body = block();
+
+          return new ExpressionFor(j, start, stop, by, body, SourceLocation.span(sourceStart, body.where));
+        } else if (has(TokenType.Of)) {
+          consume(); // eat of
+          const vector = expression();
+          if (!has(TokenType.Linebreak)) {
+            throw new LocatedException(SourceLocation.span(sourceStart, vector.where), "I expected a linebreak after this for-of loop's list.");
+          }
+          consume(); // eat linebreak
+          let body = block();
+          return new ExpressionForOf(j, vector, body, SourceLocation.span(sourceStart, body.where));
         } else {
           throw new LocatedException(sourceStart, 'I expected one of to, through, or in to specify the for loop\'s range.');
         }
-
-        if (has(TokenType.By)) {
-          consume(); // eat by
-          by = expression();
-        } else {
-          by = new ExpressionInteger(1);
-        }
-
-        if (!has(TokenType.Linebreak)) {
-          throw new LocatedException(SourceLocation.span(sourceStart, stop.where), 'I expected a linebreak after this loop\'s range.');
-        }
-        consume(); // eat linebreak
-        let body = block();
-
-        return new ExpressionFor(j, start, stop, by, body, SourceLocation.span(sourceStart, body.where));
       }
     } else if (has(TokenType.LeftSquareBracket)) {
       let sourceStart = tokens[i].where;
@@ -677,15 +689,23 @@ export function parse(tokens) {
 
         for (let [i, identifier] of identifiers.entries()) {
           actuals[identifier.source] = new ExpressionSubscript(e, new ExpressionInteger(i), SourceLocation.span(leftBracketToken, e));
+          // TODO where object
         }
       } else if (has(TokenType.Identifier)) {
         const identifier = consume();
         
         if (has(TokenType.Assign)) {
           consume(); // eat =
-          actuals[identifier.source] = expression();
+          const e = expression();
+          actuals[identifier.source] = {
+            expression: e,
+            where: SourceLocation.span(identifier.where, e.where),
+          };
         } else {
-          actuals[identifier.source] = undefined;
+          actuals[identifier.source] = {
+            expression: undefined,
+            where: identifier.where,
+          };
         }
       } else {
         throw new LocatedException(tokens[i].where, 'I expected the parameters to be named.');
