@@ -904,11 +904,13 @@ function initializeCursor() {
   ];
 
   const mesh = new Trimesh(positions, faces);
+  mesh.color(new Vector3(1, 0.5, 0));
   mesh.separateFaces();
 
   const vertexAttributes = new VertexAttributes();
   vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.getFlatPositions());
   vertexAttributes.addAttribute('vnormal', mesh.vertexCount, 4, mesh.getFlatNormals());
+  vertexAttributes.addAttribute('vcolor', mesh.vertexCount, 4, mesh.getFlatColors());
   vertexAttributes.addIndices(mesh.getFlatFaces());
 
   const vertexArray = new VertexArray(solidMeshProgram, vertexAttributes);

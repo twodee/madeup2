@@ -1040,16 +1040,14 @@ export class ExpressionFunctionCall extends Expression {
     let unknownParameters = [];
 
     let callEnvironment = Environment.create(env);
-    console.log("this.actuals:", this.actuals);
     for (let [identifier, actual] of Object.entries(this.actuals)) {
-      const actualExpression = actual.expression;
       if (!f.formals.find(formal => formal.name === identifier)) {
-        unknownParameters.push({identifier: identifier, isAutoscopic: !actualExpression});
+        unknownParameters.push({identifier: identifier, isAutoscopic: !actual.expression});
       } else {
         providedParameters.push(identifier);
         let value;
-        if (actualExpression) {
-          value = actualExpression.evaluate(env);
+        if (actual.expression) {
+          value = actual.expression.evaluate(env);
         } else {
           if (!env.ownsVariable(identifier)) {
             throw new LocatedException(actual.where, `I expected <var>${identifier}</var> to be defined. But it's not.\n\nPerhaps the documentation might help.`, {documentation: f.documentation, providedParameters});
