@@ -13,7 +13,7 @@ import {
 import {Environment} from './environment.js';
 import {Camera} from './twodeejs/camera.js';
 import {Vector3} from './twodeejs/vector.js';
-import {Polyline} from './polyline.js';
+import {Path} from './path.js';
 import {Builtins} from './builtins.js';
 
 const seedrandom = require('seedrandom');
@@ -44,7 +44,7 @@ export class InterpreterEnvironment extends Environment {
     this.prng = new Random();
     this.log = log;
     this.root = this;
-    this.polylines = [new Polyline()];
+    this.paths = [new Path()];
     this.meshes = [];
     this.calls = [];
 
@@ -55,25 +55,22 @@ export class InterpreterEnvironment extends Environment {
     this.calls.push({where, documentation, providedParameters});
   }
 
-  // get currentCall() {
-    // return this.calls[this.calls.length - 1];
-  // }
-
   seal() {
-    const polyline = this.polylines[this.polylines.length - 1];
-    this.polylines.push(new Polyline());
-    return polyline;
+    const path = this.paths[this.paths.length - 1];
+    this.paths.push(new Path());
+    path.seal();
+    return path;
   }
 
-  get currentPolyline() {
-    return this.polylines[this.polylines.length - 1];
+  get currentPath() {
+    return this.paths[this.paths.length - 1];
   }
 
   visit(configuration) {
-    const polyline = this.currentPolyline;
-    polyline.add({
+    const path = this.currentPath;
+    path.add({
       ...configuration,
-      position: polyline.turtle.from,
+      position: path.turtle.from,
     });
   }
 
@@ -95,7 +92,7 @@ export class InterpreterEnvironment extends Environment {
   toPod() {
     const pod = super.toPod();
     Object.assign(pod, {
-      polylines: this.polylines.map(polyline => polyline.toPod()),
+      paths: this.paths.map(path => path.toPod()),
       renderMode: this.renderMode,
       meshes: this.meshes.map(({name, mesh}) => ({name, mesh: mesh.toPod()})),
       calls: this.calls,

@@ -26,7 +26,7 @@ import {Trimesh} from './twodeejs/trimesh.js';
 import {Prefab} from './twodeejs/prefab.js';
 import {Camera} from './twodeejs/camera.js';
 import {MathUtilities} from './twodeejs/mathutilities.js';
-import {Polyline} from './polyline.js';
+import {Path} from './path.js';
 
 // --------------------------------------------------------------------------- 
 
@@ -46,7 +46,7 @@ let canvas;
 let centerTransform;
 let meshes;
 
-let polylines;
+let paths;
 
 let meshObjects;
 let pathObjects;
@@ -155,10 +155,10 @@ function postInterpret(pod) {
   const needsFit = !contentBounds;
 
   if (pod.renderMode === RenderMode.Pathify) {
-    polylines = pod.polylines.map(pod => Polyline.fromPod(pod));
-    pathObjects = polylines.filter(polyline => polyline.vertices.length > 0).map(polyline => generatePathObject(polyline.vertices));
+    paths = pod.paths.map(pod => Path.fromPod(pod));
+    pathObjects = paths.filter(path => path.vertices.length > 0).map(path => generatePathObject(path));
 
-    const positions = polylines.flatMap(polyline => polyline.vertices);
+    const positions = paths.flatMap(path => path.vertices);
 
     if (positions.length > 0) {
       contentBounds = {
@@ -526,7 +526,7 @@ function syncTitle() {
 
 function initialize() {
   pathObjects = [];
-  polylines = [];
+  paths = [];
   meshObjects = [];
   meshes = [];
   isMouseDown = false;
@@ -941,7 +941,7 @@ function initializePathifyNodeObject() {
 
 // --------------------------------------------------------------------------- 
 
-function generateNodeObject(polyline) {
+function generateNodeObject(path) {
   const positions = [];
   const corners = [];
   const indices = [];
@@ -954,7 +954,7 @@ function generateNodeObject(polyline) {
   ];
 
   let i = 0;
-  for (let vertex of polyline) {
+  for (let vertex of path) {
     for (let i = 0; i < 4; ++i) {
       positions.push(vertex[0]);
       positions.push(vertex[1]);
@@ -969,8 +969,8 @@ function generateNodeObject(polyline) {
   const object = {};
 
   object.vertexAttributes = new VertexAttributes();
-  object.vertexAttributes.addAttribute('vposition', polyline.length * 4, 3, positions);
-  object.vertexAttributes.addAttribute('corner', polyline.length * 4, 2, corners);
+  object.vertexAttributes.addAttribute('vposition', path.length * 4, 3, positions);
+  object.vertexAttributes.addAttribute('corner', path.length * 4, 2, corners);
   object.vertexAttributes.addIndices(indices);
 
   object.vertexArray = new VertexArray(nodeProgram, object.vertexAttributes);
@@ -980,61 +980,63 @@ function generateNodeObject(polyline) {
 
 // --------------------------------------------------------------------------- 
 
-function generatePathObject(polyline) {
+function generatePathObject(path) {
   const vpositions = [];
   const as = [];
   const bs = [];
   const directions = [];
+  const vertices = path.vertices;
 
-  for (let i = 0; i < polyline.length - 1; ++i) {
+  const nvertices = path.isClosed ? path.vertices.length : path.vertices.length - 1;
+  for (let i = 0; i < nvertices; ++i) {
     // Triangle A
 
     // Vertex 0
-    vpositions.push(...polyline[i]);
-    as.push(...polyline[i]);
-    bs.push(...polyline[i + 1]);
+    vpositions.push(...vertices[i]);
+    as.push(...vertices[i]);
+    bs.push(...vertices[(i + 1) % vertices.length]);
     directions.push(1);
 
     // Vertex 1
-    vpositions.push(...polyline[i]);
-    as.push(...polyline[i]);
-    bs.push(...polyline[i + 1]);
+    vpositions.push(...vertices[i]);
+    as.push(...vertices[i]);
+    bs.push(...vertices[(i + 1) % vertices.length]);
     directions.push(-1);
 
     // Vertex 2
-    vpositions.push(...polyline[i + 1]);
-    as.push(...polyline[i]);
-    bs.push(...polyline[i + 1]);
+    vpositions.push(...vertices[(i + 1) % vertices.length]);
+    as.push(...vertices[i]);
+    bs.push(...vertices[(i + 1) % vertices.length]);
     directions.push(1);
 
     // Triangle B
 
     // Vertex 0
-    vpositions.push(...polyline[i]);
-    as.push(...polyline[i]);
-    bs.push(...polyline[i + 1]);
+    vpositions.push(...vertices[i]);
+    as.push(...vertices[i]);
+    bs.push(...vertices[(i + 1) % vertices.length]);
     directions.push(-1);
 
     // Vertex 2
-    vpositions.push(...polyline[i + 1]);
-    as.push(...polyline[i]);
-    bs.push(...polyline[i + 1]);
+    vpositions.push(...vertices[(i + 1) % vertices.length]);
+    as.push(...vertices[i]);
+    bs.push(...vertices[(i + 1) % vertices.length]);
     directions.push(-1);
 
     // Vertex 3
-    vpositions.push(...polyline[i + 1]);
-    as.push(...polyline[i]);
-    bs.push(...polyline[i + 1]);
+    vpositions.push(...vertices[(i + 1) % vertices.length]);
+    as.push(...vertices[i]);
+    bs.push(...vertices[(i + 1) % vertices.length]);
     directions.push(1);
   }
 
   const object = {};
 
   object.vertexAttributes = new VertexAttributes();
-  object.vertexAttributes.addAttribute('vposition', (polyline.length - 1) * 6, 3, vpositions);
-  object.vertexAttributes.addAttribute('a', (polyline.length - 1) * 6, 3, as);
-  object.vertexAttributes.addAttribute('b', (polyline.length - 1) * 6, 3, bs);
-  object.vertexAttributes.addAttribute('direction', (polyline.length - 1) * 6, 1, directions);
+  object.vertexAttributes.addAttribute('vposition', nvertices * 6, 3, vpositions);
+  object.vertexAttributes.addAttribute('a', nvertices * 6, 3, as);
+  object.vertexAttributes.addAttribute('b', nvertices * 6, 3, bs);
+  object.vertexAttributes.addAttribute('direction', nvertices * 6, 1, directions);
 
   object.vertexArray = new VertexArray(pathProgram, object.vertexAttributes);
 
@@ -1303,8 +1305,8 @@ function render() {
     nodeProgram.bind();
     nodeProgram.setUniformMatrix4('eyeToClip', eyeToClip);
     nodeObject.vertexArray.bind();
-    for (let polyline of polylines) {
-      for (let vertex of polyline.vertices) {
+    for (let path of paths) {
+      for (let vertex of path.vertices) {
         nodeProgram.setUniformMatrix4('modelToEye', worldToEye.multiplyMatrix(Matrix4.translate(vertex[0], vertex[1], vertex[2])));
         nodeObject.vertexArray.drawIndexed(gl.TRIANGLES);
       }
@@ -1314,9 +1316,9 @@ function render() {
 
     solidMeshProgram.bind();
     solidMeshProgram.setUniformMatrix4('eyeToClip', eyeToClip);
-    for (let polyline of polylines) {
-      if (polyline.vertices.length > 0) {
-        solidMeshProgram.setUniformMatrix4('modelToEye', worldToEye.multiplyMatrix(polyline.turtle.matrix.inverse()));
+    for (let path of paths) {
+      if (path.vertices.length > 0) {
+        solidMeshProgram.setUniformMatrix4('modelToEye', worldToEye.multiplyMatrix(path.turtle.matrix.inverse()));
         cursorObject.vertexArray.bind();
         cursorObject.vertexArray.drawIndexed(gl.TRIANGLES);
         cursorObject.vertexArray.unbind();

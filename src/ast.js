@@ -13,6 +13,7 @@ import {
   SourceLocation,
 } from './token.js';
 
+import {Path} from './path.js';
 import {Polyline} from './twodeejs/polyline.js';
 import {Vector3} from './twodeejs/vector.js';
 import {Matrix4} from './twodeejs/matrix.js';
@@ -2193,7 +2194,7 @@ export class ExpressionMoveto extends ExpressionFunction {
     const color = env.variables.color;
     const color3 = new Vector3(color.get(0).value, color.get(1).value, color.get(2).value);
 
-    env.root.currentPolyline.turtle.relocate(new Vector3(x, y, z));
+    env.root.currentPath.turtle.relocate(new Vector3(x, y, z));
     env.root.visit({
       radius,
       color: color3,
@@ -2217,7 +2218,7 @@ export class ExpressionPolarto extends ExpressionFunction {
     const y = distance * Math.sin(radians) + origin.get(1).value;
     const z = origin.get(2).value;
 
-    env.root.currentPolyline.turtle.relocate(new Vector3(x, y, z));
+    env.root.currentPath.turtle.relocate(new Vector3(x, y, z));
     env.root.visit({
       radius,
       color: color3,
@@ -2234,7 +2235,7 @@ export class ExpressionMove extends ExpressionFunction {
     const color = env.variables.color;
     const color3 = new Vector3(color.get(0).value, color.get(1).value, color.get(2).value);
 
-    env.root.currentPolyline.turtle.advance(distance);
+    env.root.currentPath.turtle.advance(distance);
     env.root.visit({
       radius,
       color: color3,
@@ -2261,7 +2262,7 @@ export class ExpressionStay extends ExpressionFunction {
 export class ExpressionYaw extends ExpressionFunction {
   evaluate(env) {
     const degrees = env.variables.degrees.value;
-    env.root.currentPolyline.turtle.yaw(degrees);
+    env.root.currentPath.turtle.yaw(degrees);
   }
 }
 
@@ -2270,7 +2271,7 @@ export class ExpressionYaw extends ExpressionFunction {
 export class ExpressionPitch extends ExpressionFunction {
   evaluate(env) {
     const degrees = env.variables.degrees.value;
-    env.root.currentPolyline.turtle.pitch(degrees);
+    env.root.currentPath.turtle.pitch(degrees);
   }
 }
 
@@ -2279,7 +2280,7 @@ export class ExpressionPitch extends ExpressionFunction {
 export class ExpressionRoll extends ExpressionFunction {
   evaluate(env) {
     const degrees = env.variables.degrees.value;
-    env.root.currentPolyline.turtle.roll(degrees);
+    env.root.currentPath.turtle.roll(degrees);
   }
 }
 
@@ -2287,14 +2288,14 @@ export class ExpressionRoll extends ExpressionFunction {
 
 export class ExpressionHome extends ExpressionFunction {
   evaluate(env) {
-    const polyline = env.root.currentPolyline;
+    const path = env.root.currentPath;
 
-    if (!polyline || polyline.vertices.length === 0) {
+    if (!path || path.vertices.length === 0) {
       throw new MessagedException("I expected home to be called on a non-empty path.");
     }
 
-    const vertex = polyline.vertices[0];
-    env.root.currentPolyline.turtle.relocate(vertex.position);
+    const vertex = path.vertices[0];
+    env.root.currentPath.turtle.relocate(vertex.position);
     env.root.visit({
       radius: vertex.radius,
       color: vertex.color,
@@ -2311,11 +2312,11 @@ export class ExpressionDowel extends ExpressionFunction {
     const sharpness = env.variables.sharpness.value;
     const name = env.variables.name.value;
 
-    const polyline = env.root.seal();
+    const path = env.root.seal();
     const positions = [];
     const colors = [];
     const faces = [];
-    const vertices = [...polyline.vertices];
+    const vertices = [...path.vertices];
 
     // Helpers.
     const arePositionsCoincident = (a, b) => a.position.distance(b.position) < 1e-6;
@@ -2373,16 +2374,10 @@ export class ExpressionDowel extends ExpressionFunction {
       throw new MessagedException("I expected this dowel to have at least two vertices.");
     }
 
-    // The dowel path is closed only if the first and last vertex have an
-    // identical position and radius.
-    const isCircuit =
-      arePositionsCoincident(vertices[0], vertices[vertices.length - 1]) &&
-      MathUtilities.isClose(vertices[0].radius, vertices[vertices.length - 1].radius, 1e-6);
-
     // Migrate any coincident stays at the end of the dowel to the beginning.
-    if (isCircuit && stops.length > 1 && arePositionsCoincident(stops[0], stops[stops.length - 1])) {
+    if (path.isClosed && stops.length > 1 && arePositionsCoincident(stops[0], stops[stops.length - 1])) {
       const {variables} = stops.pop();
-      stops[0].variables = [...variables.slice(0, variables.length - 1), ...stops[0].variables];
+      stops[0].variables = [...variables, ...stops[0].variables];
     }
 
     // Seed first rings.
@@ -2410,7 +2405,7 @@ export class ExpressionDowel extends ExpressionFunction {
     // If the dowel is a closed circuit, then we need to project the positions
     // back onto a miter plane that bisects the angle between the last and
     // first segments or round off the bend.
-    if (isCircuit) {
+    if (path.isClosed) {
       const backward = stops[stops.length - 1].position.subtract(stops[0].position).normalize();
       const radians = Math.acos(forward.dot(backward.inverse()));
       const degrees = MathUtilities.toDegrees(radians);
@@ -2457,7 +2452,7 @@ export class ExpressionDowel extends ExpressionFunction {
       
       // If this is the last position of a non-circuit, we intersect with a
       // plane perpendicular to the segment.
-      if (i === stops.length - 1 && !isCircuit) {
+      if (i === stops.length - 1 && !path.isClosed) {
         const plane = new Plane(stops[i].position, to);
         const base = positions.length - nsides;
         intersectPlaneAndRescale(plane, to, stops[i - 1].position, stops[i].variables[0], base);
@@ -2513,7 +2508,7 @@ export class ExpressionDowel extends ExpressionFunction {
       }
     }
 
-    if (isCircuit) {
+    if (path.isClosed) {
       const base = positions.length - nsides;
       for (let i = 0; i < nsides; ++i) {
         faces.push([base + i, base + (i + 1) % nsides, (i + 1) % nsides]);
@@ -2521,7 +2516,7 @@ export class ExpressionDowel extends ExpressionFunction {
       }
     }
 
-    if (!isCircuit) {
+    if (!path.isClosed) {
       positions.push(stops[0].position);
       positions.push(stops[stops.length - 1].position);
       colors.push(stops[0].variables[0].color);
@@ -2554,14 +2549,13 @@ export class ExpressionRevolve extends ExpressionFunction {
       throw new LocatedException(env.variables.degrees.unevaluated.where, 'I expected the number of degrees given to <var>revolve</var> to be in the interval [-360, 360].');
     }
 
-    const polyline = env.root.seal();
+    const path = env.root.seal();
     const faces = [];
 
-    if (polyline.vertices.length < 2) {
+    if (path.vertices.length < 2) {
       throw new MessagedException("I expected this revolve to have at least two vertices.");
     }
 
-    const isCrossSectionClosed = polyline.vertices[0].position.distance(polyline.vertices[polyline.vertices.length - 1].position) < 1e-6;
     const degreesDelta = degrees / nsides;
 
     const axis3 = new Vector3(axis.value[0].value, axis.value[1].value, axis.value[2].value).normalize();
@@ -2570,10 +2564,7 @@ export class ExpressionRevolve extends ExpressionFunction {
     const isRotationClosed = Math.abs(Math.abs(degrees) - 360) < 1e-6;
     const ringCount = isRotationClosed ? nsides : nsides + 1;
 
-    const vertices = [...polyline.vertices];
-    if (isCrossSectionClosed) {
-      vertices.splice(vertices.length - 1, 1);
-    }
+    const vertices = [...path.vertices];
 
     let delta = new Vector3(0, 0, 0);
     for (let i = 0; delta.magnitude < 1e-6 && i < vertices.length; ++i) {
@@ -2602,7 +2593,7 @@ export class ExpressionRevolve extends ExpressionFunction {
       }
     }
 
-    const vertexCount = isCrossSectionClosed ? vertices.length : vertices.length - 1;
+    const vertexCount = path.isClosed ? vertices.length : vertices.length - 1;
 
     const lastRingIndex = isRotationClosed ? ringCount - 1 : ringCount - 2;
     for (let ringIndex = 0; ringIndex <= lastRingIndex; ++ringIndex) {
@@ -2623,7 +2614,7 @@ export class ExpressionRevolve extends ExpressionFunction {
 
     // Only if the cross section is closed but the revolution is incomplete do
     // we add caps.
-    if (!isRotationClosed && isCrossSectionClosed) {
+    if (!isRotationClosed && path.isClosed) {
       const baseCap = Trimesh.triangulate(positions.slice(0, vertices.length));
       baseCap.reverseWinding();
 
@@ -2648,13 +2639,13 @@ export class ExpressionRevolve extends ExpressionFunction {
 
 export class ExpressionCubes extends ExpressionFunction {
   evaluate(env) {
-    const polyline = env.root.seal();
+    const path = env.root.seal();
     const name = env.variables.name.value;
 
-    for (let [i, vertex] of polyline.vertices.entries()) {
+    for (let [i, vertex] of path.vertices.entries()) {
       const mesh = Prefab.cube(vertex.radius * 2, vertex.position);
       mesh.color(vertex.color);
-      const actualName = name instanceof ExpressionUnit ? undefined : (polyline.vertices.length === 1 ? name : `${name}-${i}`);
+      const actualName = name instanceof ExpressionUnit ? undefined : (path.vertices.length === 1 ? name : `${name}-${i}`);
       env.root.addMesh(actualName, mesh);
     }
   }
@@ -2664,14 +2655,14 @@ export class ExpressionCubes extends ExpressionFunction {
 
 export class ExpressionSpheres extends ExpressionFunction {
   evaluate(env) {
-    const polyline = env.root.seal();
+    const path = env.root.seal();
     const nsides = env.variables.nsides.value;
     const name = env.variables.name.value;
 
-    for (let [i, vertex] of polyline.vertices.entries()) {
+    for (let [i, vertex] of path.vertices.entries()) {
       const mesh = Prefab.sphere(vertex.radius, vertex.position, nsides, Math.ceil(nsides / 2));
       mesh.color(vertex.color);
-      const actualName = name instanceof ExpressionUnit ? undefined : (polyline.vertices.length === 1 ? name : `${name}-${i}`);
+      const actualName = name instanceof ExpressionUnit ? undefined : (path.vertices.length === 1 ? name : `${name}-${i}`);
       env.root.addMesh(actualName, mesh);
     }
   }
@@ -2683,21 +2674,15 @@ export class ExpressionExtrude extends ExpressionFunction {
   evaluate(env) {
     const axis = env.variables.axis;
     const distance = env.variables.distance.value;
-    const polyline = env.root.seal();
+    const path = env.root.seal();
     const name = env.variables.name.value;
 
-    if (polyline.vertices.length < 2) {
+    if (path.vertices.length < 2) {
       throw new MessagedException("I expected this extrude to have at least 2 vertices.");
     }
 
-    const isClosed = polyline.vertices[0].position.distance(polyline.vertices[polyline.vertices.length - 1].position) < 1e-6;
+    let vertices = [...path.vertices];
 
-    let vertices = [...polyline.vertices];
-    if (vertices[0].position.distance(vertices[vertices.length - 1].position) < 1e-6) {
-      vertices.splice(vertices.length - 1, 1);
-    }
-
-    const n = vertices.length;
     const positions = [];
     const colors = [];
     const faces = [];
@@ -2715,9 +2700,10 @@ export class ExpressionExtrude extends ExpressionFunction {
     positions.push(...positions.map(position => position.add(offset)));
     colors.push(...vertices.map(vertex => vertex.color));
 
-    for (let i = 0; i < n; ++i) {
-      faces.push([i, (i + 1) % n, i + n]);
-      faces.push([(i + 1) % n, (i + 1) % n + n, i + n]);
+    const stopIndex = path.isClosed ? vertices.length : vertices.length - 1;
+    for (let i = 0; i < stopIndex; ++i) {
+      faces.push([i, (i + 1) % vertices.length, i + vertices.length]);
+      faces.push([(i + 1) % vertices.length, (i + 1) % vertices.length + vertices.length, i + vertices.length]);
     }
 
     if (normalDotAxis < 0) {
@@ -2729,7 +2715,7 @@ export class ExpressionExtrude extends ExpressionFunction {
     }
 
     // If the cross section is closed, then we add caps.
-    if (isClosed) {
+    if (path.isClosed) {
       const baseCap = Trimesh.triangulate(positions.slice(0, positions.length / 2));
       if ((isCounterClockwise && normalDotAxis > 0) || (!isCounterClockwise && normalDotAxis < 0)) {
         baseCap.reverseWinding();
@@ -2759,15 +2745,11 @@ export class ExpressionExtrude extends ExpressionFunction {
 
 export class ExpressionPolygon extends ExpressionFunction {
   evaluate(env) {
-    const polyline = env.root.seal();
+    const path = env.root.seal();
     const isFlipped = env.variables.flip.value;
     const name = env.variables.name.value;
 
-    let vertices = [...polyline.vertices];
-    if (vertices.length >= 3 && vertices[0].position.distance(vertices[vertices.length - 1].position) < 1e-6) {
-      vertices.splice(vertices.length - 1, 1);
-    }
-
+    let vertices = [...path.vertices];
     if (vertices.length < 3) {
       throw new MessagedException("I expected this polygon to have at least three unique vertices.");
     }
@@ -2786,8 +2768,8 @@ export class ExpressionPolygon extends ExpressionFunction {
 
 // --------------------------------------------------------------------------- 
 
-export class ExpressionPolyline extends ExpressionData {
-  static type = 'polyline';
+export class ExpressionPath extends ExpressionData {
+  static type = 'path';
   static article = 'a';
 
   constructor(value, where) {
@@ -2805,8 +2787,8 @@ export class ExpressionPolyline extends ExpressionData {
 
 export class ExpressionMold extends ExpressionFunction {
   evaluate(env) {
-    const polyline = env.root.seal();
-    return new ExpressionPolyline(polyline);
+    const path = env.root.seal();
+    return new ExpressionPath(path);
   }
 }
 
@@ -2814,7 +2796,7 @@ export class ExpressionMold extends ExpressionFunction {
 
 export class ExpressionRotate extends ExpressionFunction {
   evaluate(env) {
-    const polyline = env.variables.path.value;
+    const path = env.variables.path.value;
     const degrees = env.variables.degrees.value;
     const axis = env.variables.axis;
     const origin = env.variables.origin;
@@ -2823,16 +2805,18 @@ export class ExpressionRotate extends ExpressionFunction {
 
     const rotater = Matrix4.rotateAround(axis3, degrees, origin3);
 
-    for (let vertex of polyline.vertices) {
-      const position = rotater.multiplyVector(vertex.position.toVector4(1)).toVector3();
-      env.root.currentPolyline.turtle.relocate(position);
-      env.root.visit({
-        radius: vertex.radius,
-        color: vertex.color,
-      });
-    }
+    const newPath = new Path();
+    newPath.isClosed = path.isClosed;
+    newPath.turtle = path.turtle;
 
-    return new ExpressionPolyline(env.root.seal());
+    newPath.vertices = path.vertices.map(vertex => ({
+      ...vertex,
+      position: rotater.multiplyVector(vertex.position.toVector4(1)).toVector3(),
+    }));
+
+    env.root.paths.splice(env.root.paths.length - 1, 0, newPath);
+
+    return new ExpressionPath(newPath);
   }
 }
 
@@ -2840,18 +2824,19 @@ export class ExpressionRotate extends ExpressionFunction {
 
 export class ExpressionTable extends ExpressionFunction {
   evaluate(env) {
-    const polylines = env.variables.rows.value.map(ep => ep.value);
+    const paths = env.variables.rows.value.map(ep => ep.value);
 
-    const positions = polylines.flatMap(polyline => polyline.vertices.map(vertex => vertex.position));
-    const colors = polylines.flatMap(polyline => polyline.vertices.map(vertex => vertex.color));
+    const positions = paths.flatMap(path => path.vertices.map(vertex => vertex.position));
+    const colors = paths.flatMap(path => path.vertices.map(vertex => vertex.color));
 
     const faces = [];
-    for (let ringIndex = 0; ringIndex < polylines.length - 1; ++ringIndex) {
-      const polyline = polylines[ringIndex];
-      const base = ringIndex * polyline.vertices.length;
-      for (let i = 0; i < polyline.vertices.length - 1; ++i) {
-        faces.push([base + i, base + i + polyline.vertices.length, base + i + 1]);
-        faces.push([base + i + 1, base + i + polyline.vertices.length, base + i + polyline.vertices.length + 1]);
+    for (let ringIndex = 0; ringIndex < paths.length - 1; ++ringIndex) {
+      const path = paths[ringIndex];
+      const base = ringIndex * path.vertices.length;
+      const stopIndex = path.isClosed ? path.vertices.length : path.vertices.length - 1;
+      for (let i = 0; i < stopIndex; ++i) {
+        faces.push([base + i, base + i + path.vertices.length, base + (i + 1) % path.vertices.length]);
+        faces.push([base + (i + 1) % path.vertices.length, base + i + path.vertices.length, base + path.vertices.length + (i + 1) % path.vertices.length]);
       }
     }
 
@@ -2866,7 +2851,7 @@ export class ExpressionTable extends ExpressionFunction {
 
 export class ExpressionMesh extends ExpressionFunction {
   evaluate(env) {
-    // const polyline = env.root.seal();
+    // const path = env.root.seal();
 
     const verticesList = env.variables.vertices.value;
     const facesList = env.variables.faces.value;
