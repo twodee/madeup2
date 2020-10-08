@@ -2825,18 +2825,35 @@ export class ExpressionRotate extends ExpressionFunction {
 export class ExpressionTable extends ExpressionFunction {
   evaluate(env) {
     const paths = env.variables.rows.value.map(ep => ep.value);
+    const isCircuit = paths.length > 1 && paths[0].equals(paths[paths.length - 1]);
+
+    let stopIndex;
+    if (isCircuit) {
+      paths.splice(paths.length - 1, 1);
+      stopIndex = paths.length;
+    } else {
+      stopIndex = paths.length - 1;
+    }
 
     const positions = paths.flatMap(path => path.vertices.map(vertex => vertex.position));
     const colors = paths.flatMap(path => path.vertices.map(vertex => vertex.color));
 
     const faces = [];
-    for (let ringIndex = 0; ringIndex < paths.length - 1; ++ringIndex) {
+    for (let ringIndex = 0; ringIndex < stopIndex; ++ringIndex) {
       const path = paths[ringIndex];
       const base = ringIndex * path.vertices.length;
       const stopIndex = path.isClosed ? path.vertices.length : path.vertices.length - 1;
       for (let i = 0; i < stopIndex; ++i) {
-        faces.push([base + i, base + i + path.vertices.length, base + (i + 1) % path.vertices.length]);
-        faces.push([base + (i + 1) % path.vertices.length, base + i + path.vertices.length, base + path.vertices.length + (i + 1) % path.vertices.length]);
+        faces.push([
+          base + i,
+          (base + i + path.vertices.length) % positions.length,
+          (base + (i + 1) % path.vertices.length) % positions.length,
+        ]);
+        faces.push([
+          base + (i + 1) % path.vertices.length,
+          (base + i + path.vertices.length) % positions.length,
+          (base + path.vertices.length + (i + 1) % path.vertices.length) % positions.length,
+        ]);
       }
     }
 
