@@ -122,14 +122,15 @@ export const Builtins = (function() {
       nameParameter,
     ], new ExpressionRevolve()),
 
-    extrude: new FunctionDefinition('extrude', 'TODO', [
-      new FormalParameter('axis'),
-      new FormalParameter('distance'),
+    extrude: new FunctionDefinition('extrude', 'Create a solid object whose cross section is the current path.', [
+      new FormalParameter('axis', 'The direction in which the cross section is extended.'),
+      new FormalParameter('distance', 'The distance to extend along the axis.'),
       nameParameter,
     ], new ExpressionExtrude()),
 
-    mesh: new FunctionDefinition('mesh', 'TODO', [
-      new FormalParameter('vertices'),
+    mesh: new FunctionDefinition('mesh', 'Create a solid object from a list of vertices and faces.', [
+      new FormalParameter('positions', "A list of the vertices' 3D positions."),
+      new FormalParameter('colors', "A list of the individual vertices' RGB colors.", new ExpressionUnit()),
       new FormalParameter('faces'),
       nameParameter,
     ], new ExpressionMesh()),

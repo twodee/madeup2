@@ -29,6 +29,13 @@ import {MathUtilities} from './twodeejs/mathutilities.js';
 import {Path} from './path.js';
 
 // --------------------------------------------------------------------------- 
+// OPTIONS
+
+const hasWorker = false;
+let isWireframe = false;
+
+// --------------------------------------------------------------------------- 
+// GLOBALS
 
 let editor;
 let Range;
@@ -57,7 +64,6 @@ let pathProgram;
 let solidMeshProgram;
 let wireMeshProgram;
 
-let isWireframe = false;
 let docMap;
 
 let eyeToClip;
@@ -365,7 +371,6 @@ function startInterpreting(renderMode, isErrorDelayed) {
     }
   });
 
-  const hasWorker = false;
   if (hasWorker) {
     interpreterWorker.postMessage({
       command: 'interpret',

@@ -1651,17 +1651,17 @@ export class ExpressionSeed extends ExpressionFunction {
 
 export class ExpressionRandom extends ExpressionFunction {
   evaluate(env, callExpression) {
-    let min = env.get('min').value;
-    let max = env.get('max').value;
+    let min = env.variables.min;
+    let max = env.variables.max;
 
     let x;
-    if (env.get('min') instanceof ExpressionInteger && env.get('max') instanceof ExpressionInteger) {
+    if (min instanceof ExpressionInteger && max instanceof ExpressionInteger) {
       let random = env.root.prng.random01();
-      let x = Math.floor(random * (max - min) + min);
+      let x = Math.floor(random * (max.value - min.value) + min.value);
       return new ExpressionInteger(x);
     } else {
       let random = env.root.prng.random01();
-      let x = random * (max - min) + min;
+      let x = random * (max.value - min.value) + min.value;
       return new ExpressionReal(x);
     }
   }
@@ -2687,31 +2687,27 @@ export class ExpressionExtrude extends ExpressionFunction {
     const colors = [];
     const faces = [];
 
-    const axis3 = new Vector3(axis.value[0].value, axis.value[1].value, axis.value[2].value);
-    const offset = axis3.normalize().scalarMultiply(distance);
+    const axis3 = new Vector3(axis.value[0].value, axis.value[1].value, axis.value[2].value).normalize();
+    const offset = axis3.scalarMultiply(distance);
 
     positions.push(...vertices.map(vertex => vertex.position));
     colors.push(...vertices.map(vertex => vertex.color));
 
     const normal = Polyline.normal(positions);
-    const normalDotAxis = normal.dot(offset);
+    const normalDotAxis = normal.dot(axis3);
     const isCounterClockwise = Polyline.isCounterClockwise(Polyline.flatten(positions));
+
+    if (normalDotAxis > 0) {
+      positions.reverse();
+    }
 
     positions.push(...positions.map(position => position.add(offset)));
     colors.push(...vertices.map(vertex => vertex.color));
 
     const stopIndex = path.isClosed ? vertices.length : vertices.length - 1;
     for (let i = 0; i < stopIndex; ++i) {
-      faces.push([i, (i + 1) % vertices.length, i + vertices.length]);
-      faces.push([(i + 1) % vertices.length, (i + 1) % vertices.length + vertices.length, i + vertices.length]);
-    }
-
-    if (normalDotAxis < 0) {
-      for (let face of faces) {
-        const tmp = face[1];
-        face[1] = face[2];
-        face[2] = tmp;
-      }
+      faces.push([i, i + vertices.length, (i + 1) % vertices.length]);
+      faces.push([(i + 1) % vertices.length, i + vertices.length, (i + 1) % vertices.length + vertices.length]);
     }
 
     // If the cross section is closed, then we add caps.

@@ -4,6 +4,7 @@ import {
 } from './token.js';
 
 import {
+  FormalParameter,
   LocatedException,
   MessagedException,
 } from './common.js';
@@ -339,14 +340,14 @@ export function parse(tokens) {
       // Parse formals.
       let formals = [];
       if (has(TokenType.Identifier)) {
-        formals.push(tokens[i].source);
+        formals.push(new FormalParameter(tokens[i].source));
         consume();
         // TODO check for default value
 
         while (has(TokenType.Comma)) {
           consume(); // eat comma
           if (has(TokenType.Identifier)) {
-            formals.push(tokens[i].source);
+            formals.push(new FormalParameter(tokens[i].source));
             consume();
             // TODO check for default value
           } else {
