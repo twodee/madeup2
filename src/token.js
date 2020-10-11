@@ -82,6 +82,14 @@ export class SourceLocation {
            this.columnEnd + ':';
   }
 
+  toPreCursor() {
+    return new SourceLocation(this.lineStart, this.lineStart, this.columnStart, this.columnStart - 1);
+  }
+
+  toPostCursor() {
+    return new SourceLocation(this.lineEnd, this.lineEnd, this.columnEnd, this.columnEnd);
+  }
+
   static span(a, b) {
     return new SourceLocation(a.lineStart, b.lineEnd, a.columnStart, b.columnEnd);
   }

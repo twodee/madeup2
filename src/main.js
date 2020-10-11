@@ -90,6 +90,7 @@ function highlight(lineStart, lineEnd, columnStart, columnEnd) {
   const range = new Range(lineStart, columnStart, lineEnd, columnEnd + 1);
   editor.getSelection().setSelectionRange(range);
   editor.revealRange(range);
+  editor.focus();
 }
 
 // --------------------------------------------------------------------------- 
@@ -425,7 +426,8 @@ function showCallDocs(callRecord) {
 
   const descriptionDiv = document.createElement('div');
   descriptionDiv.classList.add('function-docs-description');
-  descriptionDiv.appendChild(document.createTextNode(callRecord.documentation.description));
+  descriptionDiv.innerHTML = callRecord.documentation.description;
+  // descriptionDiv.appendChild(document.createTextNode(callRecord.documentation.description));
   docsDiv.appendChild(descriptionDiv);
 
   const parametersTitleDiv = document.createElement('h3');
@@ -439,7 +441,7 @@ function showCallDocs(callRecord) {
     const grid = document.createElement('div');
     grid.classList.add('function-docs-parameter-grid');
 
-    for (let parameter of callRecord.documentation.parameters) {
+    for (let [i, parameter] of callRecord.documentation.parameters.entries()) {
       // const parameterDiv = document.createElement('div');
       // parameterDiv.classList.add('function-docs-parameter');
 
@@ -466,7 +468,7 @@ function showCallDocs(callRecord) {
 
       if (parameter.description) {
         const descriptionSpan = document.createElement('span');
-        descriptionSpan.appendChild(document.createTextNode(`${parameter.description}`));
+        descriptionSpan.innerHTML = parameter.description;
         descriptionElement.appendChild(descriptionSpan);
       }
 
@@ -482,6 +484,12 @@ function showCallDocs(callRecord) {
       }
 
       grid.appendChild(descriptionElement);
+
+      if (i < callRecord.documentation.parameters.length - 1) {
+        const separator = document.createElement('div');
+        separator.classList.add('function-docs-separator');
+        grid.appendChild(separator);
+      }
     }
 
     docsDiv.appendChild(grid);
@@ -837,11 +845,23 @@ function initializeDOM() {
   // Register callbacks.
   canvas.addEventListener('mousedown', mouseDown);
   canvas.addEventListener('mouseup', mouseUp);
-  canvas.addEventListener('wheel', mouseWheel, {passive: true});
+  canvas.addEventListener('wheel', mouseWheel, {passive: false});
 
-  document.addEventListener('wheel', event => {
-    event.preventDefault();
-  }, {passive: false});
+  right.addEventListener('wheel', event => {
+    console.log("hi");
+    // event.preventDefault();
+  }, {passive: true});
+
+  const docsRoot = document.getElementById('docs-root');
+  docsRoot.addEventListener('wheel', event => {
+    console.log("boo");
+    // event.preventDefault();
+  }, {passive: true});
+
+  // document.addEventListener('wheel', event => {
+    // console.log("prevent default");
+    // event.preventDefault();
+  // }, {passive: false});
 
   document.addEventListener('keydown', event => {
     if ((event.ctrlKey || event.metaKey) && event.key === 's') {
@@ -1424,6 +1444,7 @@ function mouseUp(e) {
 // --------------------------------------------------------------------------- 
 
 function mouseWheel(e) {
+  e.preventDefault();
   zoom -= e.wheelDelta * 0.005;
   if (zoom <= 0) {
     zoom = 0.01;

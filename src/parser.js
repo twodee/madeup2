@@ -660,8 +660,11 @@ export function parse(tokens) {
 
     const actuals = {};
     while (!has(TokenType.RightParenthesis)) {
+      let startToken;
+
       if (has(TokenType.LeftSquareBracket)) {
         const leftBracketToken = consume();
+        startToken = leftBracketToken;
 
         const identifiers = [];
         while (!has(TokenType.RightSquareBracket)) {
@@ -694,6 +697,7 @@ export function parse(tokens) {
         }
       } else if (has(TokenType.Identifier)) {
         const identifier = consume();
+        startToken = identifier;
         
         if (has(TokenType.Assign)) {
           consume(); // eat =
@@ -711,7 +715,6 @@ export function parse(tokens) {
       } else {
         throw new LocatedException(tokens[i].where, 'I expected the parameters to be named.');
       }
-
 
       if (!has(TokenType.RightParenthesis)) {
         if (has(TokenType.Comma)) {
@@ -748,8 +751,10 @@ export function parse(tokens) {
           } else {
             throw new LocatedException(tokens[i].where, 'I expected no linebreaks in this call because there was no linebreak after the opening (.');
           }
-        } else {
+        } else if (has(TokenType.Identifier)) {
           throw new LocatedException(tokens[i].where, 'I expected a comma between parameters.');
+        } else {
+          throw new LocatedException(startToken.where.toPreCursor(), 'I expect parameters to be named.');
         }
       }
     }

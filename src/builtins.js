@@ -88,12 +88,12 @@ export const Builtins = (function() {
       nameParameter,
     ], new ExpressionDowel()),
 
-    table: new FunctionDefinition('table', 'Thicken the path into a solid dowel whose cross section is a regular polygon.', [
-      new FormalParameter('rows', 'The number of the sides. For example, 4 yields a square dowel.'),
+    table: new FunctionDefinition('table', 'Generate a solid object by connecting a sequence of cross sections together.', [
+      new FormalParameter('rows', 'An array of paths. Each path is a cross section of the solid and is connected to its neighboring paths. Unlike <var>loft</var>, each path has the same number of vertices.'),
       nameParameter,
     ], new ExpressionTable()),
 
-    mold: new FunctionDefinition('mold', 'Extract the current path into a reusable form.', [], new ExpressionMold()),
+    mold: new FunctionDefinition('mold', 'Bundle the current path into a reusable form.', [], new ExpressionMold()),
 
     rotate: new FunctionDefinition('rotate', 'Rotate the given path.', [
       new FormalParameter('path', 'The path to rotate.'),
@@ -135,7 +135,7 @@ export const Builtins = (function() {
       nameParameter,
     ], new ExpressionMesh()),
 
-    polygon: new FunctionDefinition('polygon', 'TODO', [
+    polygon: new FunctionDefinition('polygon', 'Create a flat object by filling in the current path.', [
       new FormalParameter('flip', 'Whether or not to flip the polygon over by reversing the order of its vertices.', new ExpressionBoolean(false)),
       nameParameter,
     ], new ExpressionPolygon()),
@@ -163,10 +163,10 @@ export const Builtins = (function() {
       new FormalParameter('degrees', 'The number of degrees to turn.'),
     ], new ExpressionRoll()),
 
-    polarto: new FunctionDefinition('polarto', 'TODO', [
-      new FormalParameter('distance'),
-      new FormalParameter('degrees'),
-      new FormalParameter('origin', undefined, new ExpressionVector([
+    polarto: new FunctionDefinition('polarto', 'Move to the position using 2D polar coordinates.', [
+      new FormalParameter('distance', 'The distance of the point from its origin.'),
+      new FormalParameter('degrees', 'The number of degrees the point is from the positive x-axis.'),
+      new FormalParameter('origin', 'The center of the circle in which the polar coordinates apply.', new ExpressionVector([
         new ExpressionReal(0),
         new ExpressionReal(0),
         new ExpressionReal(0),
@@ -175,7 +175,7 @@ export const Builtins = (function() {
       colorParameter,
     ], new ExpressionPolarto()),
 
-    moveto: new FunctionDefinition('moveto', 'Move to a 3D position of your choosing.', [
+    moveto: new FunctionDefinition('moveto', 'Move to a 3D position.', [
       new FormalParameter('x', 'The x-coordinate of the position.'),
       new FormalParameter('y', 'The y-coordinate of the position.'),
       new FormalParameter('z', 'The z-coordinate of the position.', new ExpressionReal(0)),
@@ -186,50 +186,63 @@ export const Builtins = (function() {
     // TODO assert that there is a starting position
     home: new FunctionDefinition('home', 'Close this path by returning to its starting position.', [], new ExpressionHome()),
 
-    print: new FunctionDefinition('print', 'TODO', [
-      new FormalParameter('message')
+    print: new FunctionDefinition('print', 'Display a message in the console.', [
+      new FormalParameter('message', 'The message to display.')
     ], new ExpressionPrint()),
-    debug: new FunctionDefinition('debug', 'TODO', [
-      new FormalParameter('expression')
+
+    debug: new FunctionDefinition('debug', 'Display some code in the console along with the value it yields when executed.', [
+      new FormalParameter('code', 'The expression to display and evaluate.')
     ], new ExpressionDebug()),
-    random: new FunctionDefinition('random', 'TODO', [
-      new FormalParameter('min'),
-      new FormalParameter('max'),
+
+    random: new FunctionDefinition('random', 'Generate a random number in a given range. If <var>min</var> and <var>max</var> are both integers, a random integer is generated. Otherwise, a random real is generated.', [
+      new FormalParameter('min', 'The least possible value.', new ExpressionInteger(0)),
+      new FormalParameter('max', 'The greatest possible value.'),
     ], new ExpressionRandom()),
-    seed: new FunctionDefinition('seed', 'TODO', [
-      new FormalParameter('value')
+
+    seed: new FunctionDefinition('seed', 'Prime the random number generator with a seed value. Normally, each run of a program will produce a different sequence of numbers from <var>random</var>. To produce a repeatable sequence, seed the random number generator with a constant value.', [
+      new FormalParameter('value', 'The seed value. This value can be an integer, a real, or a string.')
     ], new ExpressionSeed()),
-    sin: new FunctionDefinition('sin', 'TODO', [
-      new FormalParameter('degrees')
+
+    sin: new FunctionDefinition('sin', 'Calculate the ratio between the lengths of the opposite side and the hypotenuse of a right triangle.', [
+      new FormalParameter('degrees', 'The measure of the angle facing the opposite side.')
     ], new ExpressionSine()),
-    cos: new FunctionDefinition('cos', 'TODO', [
-      new FormalParameter('degrees')
+
+    cos: new FunctionDefinition('cos', 'Calculate the ratio between the lengths of the adjacent side and the hypotenuse of a right triangle.', [
+      new FormalParameter('degrees', 'The measure of the angle between the two sides.')
     ], new ExpressionCosine()),
-    tan: new FunctionDefinition('tan', 'TODO', [
-      new FormalParameter('degrees')
+
+    tan: new FunctionDefinition('tan', 'Calculate the ratio between the lengths of the opposite and adjacent sides of a right triangle.', [
+      new FormalParameter('degrees', 'The measure of the angle between the two sides.')
     ], new ExpressionTangent()),
-    asin: new FunctionDefinition('asin', 'TODO', [
-      new FormalParameter('ratio')
+
+    asin: new FunctionDefinition('asin', 'Calculate the angle of a right triangle given the ratio between its opposite side and its hypotenuse.', [
+      new FormalParameter('ratio', 'The ratio between the two sides of the triangle.')
     ], new ExpressionArcSine()),
-    hypotenuse: new FunctionDefinition('hypotenuse', 'TODO', [
-      new FormalParameter('a'),
-      new FormalParameter('b')
-    ], new ExpressionHypotenuse()),
-    acos: new FunctionDefinition('acos', 'TODO', [
-      new FormalParameter('ratio')
+
+    acos: new FunctionDefinition('acos', 'Calculate the angle of a right triangle given the ratio between its adjacent side and its hypotenuse.', [
+      new FormalParameter('ratio', 'The ratio between the two sides of the triangle.')
     ], new ExpressionArcCosine()),
-    atan: new FunctionDefinition('atan', 'TODO', [
-      new FormalParameter('ratio')
+
+    atan: new FunctionDefinition('atan', 'Calculate the angle of a right triangle given the ratio between its opposite side and its adjacent side.', [
+      new FormalParameter('ratio', 'The ratio between the two sides of the triangle.')
     ], new ExpressionArcTangent()),
-    atan2: new FunctionDefinition('atan2', 'TODO', [
-      new FormalParameter('a'),
-      new FormalParameter('b'),
+
+    atan2: new FunctionDefinition('atan2', 'Calculate the angle of a right triangle given the ratio between its opposite side and its adjacent side.', [
+      new FormalParameter('a', 'The length of the opposite side.'),
+      new FormalParameter('b', 'The length of the adjacent side.'),
     ], new ExpressionArcTangent2()),
-    sqrt: new FunctionDefinition('sqrt', 'TODO', [
-      new FormalParameter('x')
+
+    hypotenuse: new FunctionDefinition('hypotenuse', 'Calculate the hypotenuse of a right triangle given the length of its other two sides.', [
+      new FormalParameter('a', 'The length of one side of the triangle.'),
+      new FormalParameter('b', 'The length of the other side of the triangle.')
+    ], new ExpressionHypotenuse()),
+
+    sqrt: new FunctionDefinition('sqrt', 'Calculate the square root.', [
+      new FormalParameter('x', 'The number whose square root is calculated.')
     ], new ExpressionSquareRoot()),
-    int: new FunctionDefinition('int', 'TODO', [
-      new FormalParameter('x')
+
+    int: new FunctionDefinition('int', 'Convert a real number to an integer by chopping off any fraction.', [
+      new FormalParameter('x', 'The number to convert.')
     ], new ExpressionInt()),
   };
 })();

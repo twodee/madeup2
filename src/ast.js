@@ -1288,22 +1288,6 @@ export class ExpressionSubscript extends Expression {
 
 // --------------------------------------------------------------------------- 
 
-// export class ExpressionVectorAdd extends Expression {
-  // static precedence = Precedence.Property;
-
-  // constructor(instance, unevaluated) {
-    // super(undefined, unevaluated);
-    // this.instance = instance;
-  // }
-
-  // evaluate(env, callExpression) {
-    // let item = env.get('item');
-    // return this.instance.insert(item);
-  // }
-// }
-
-// --------------------------------------------------------------------------- 
-
 export class ExpressionVectorPush extends Expression {
   static precedence = Precedence.Property;
 
@@ -1405,7 +1389,7 @@ export class ExpressionVectorRotate extends Expression {
   }
 
   evaluate(env, callExpression) {
-    let degrees = env.get('degrees');
+    let degrees = env.variables.degrees;
     return this.instance.rotate(degrees);
   }
 }
@@ -1421,8 +1405,8 @@ export class ExpressionVectorRotateAround extends Expression {
   }
 
   evaluate(env, callExpression) {
-    let pivot = env.get('pivot');
-    let degrees = env.get('degrees');
+    let pivot = env.variables.pivot;
+    let degrees = env.variables.degrees;
     return this.instance.rotateAround(pivot, degrees);
   }
 }
@@ -1621,7 +1605,8 @@ export class ExpressionPrint extends ExpressionFunction {
 
 export class ExpressionDebug extends ExpressionFunction {
   evaluate(env, callExpression) {
-    const where = callExpression.actuals[0].where;
+    console.log("callExpression.actuals:", callExpression.actuals);
+    const where = callExpression.actuals.code.expression.where;
 
     const lines = env.root.source.split('\n');
     const pieces = [];
@@ -1631,7 +1616,7 @@ export class ExpressionDebug extends ExpressionFunction {
       pieces.push(lines[i].substring(startIndex, endIndex));
     }
 
-    let message = `${pieces.join("\n")}: ${env.get('expression').toPretty()}`;
+    let message = `${pieces.join("\n")}: ${env.variables.code.toPretty()}`;
     env.root.log(message);
 
     return null;
@@ -1642,7 +1627,7 @@ export class ExpressionDebug extends ExpressionFunction {
 
 export class ExpressionSeed extends ExpressionFunction {
   evaluate(env, callExpression) {
-    let seed = env.get('value').value;
+    let seed = env.variables.value.value;
     env.root.prng.seed(seed);
   }
 }
@@ -1671,7 +1656,7 @@ export class ExpressionRandom extends ExpressionFunction {
 
 export class ExpressionSine extends ExpressionFunction {
   evaluate(env, callExpression) {
-    let degrees = env.get('degrees').value;
+    let degrees = env.variables.degrees.value;
     let x = Math.sin(degrees * Math.PI / 180);
     return new ExpressionReal(x);
   }
@@ -1681,7 +1666,7 @@ export class ExpressionSine extends ExpressionFunction {
 
 export class ExpressionCosine extends ExpressionFunction {
   evaluate(env, callExpression) {
-    let degrees = env.get('degrees').value;
+    let degrees = env.variables.degrees.value;
     let x = Math.cos(degrees * Math.PI / 180);
     return new ExpressionReal(x);
   }
@@ -1691,7 +1676,7 @@ export class ExpressionCosine extends ExpressionFunction {
 
 export class ExpressionTangent extends ExpressionFunction {
   evaluate(env, callExpression) {
-    let degrees = env.get('degrees').value;
+    let degrees = env.variables.degrees.value;
     let x = Math.tan(degrees * Math.PI / 180);
     return new ExpressionReal(x);
   }
@@ -1701,7 +1686,7 @@ export class ExpressionTangent extends ExpressionFunction {
 
 export class ExpressionArcCosine extends ExpressionFunction {
   evaluate(env, callExpression) {
-    let ratio = env.get('ratio').value;
+    let ratio = env.variables.ratio.value;
     let angle = Math.acos(ratio) * 180 / Math.PI;
     return new ExpressionReal(angle);
   }
@@ -1711,7 +1696,7 @@ export class ExpressionArcCosine extends ExpressionFunction {
 
 export class ExpressionArcSine extends ExpressionFunction {
   evaluate(env, callExpression) {
-    let ratio = env.get('ratio').value;
+    let ratio = env.variables.ratio.value;
     let angle = Math.asin(ratio) * 180 / Math.PI;
     return new ExpressionReal(angle);
   }
@@ -1721,8 +1706,8 @@ export class ExpressionArcSine extends ExpressionFunction {
 
 export class ExpressionHypotenuse extends ExpressionFunction {
   evaluate(env, callExpression) {
-    let a = env.get('a').value;
-    let b = env.get('b').value;
+    let a = env.variables.a.value;
+    let b = env.variables.b.value;
     let hypotenuse = Math.sqrt(a * a + b * b);
     return new ExpressionReal(hypotenuse);
   }
@@ -1732,7 +1717,7 @@ export class ExpressionHypotenuse extends ExpressionFunction {
 
 export class ExpressionArcTangent extends ExpressionFunction {
   evaluate(env, callExpression) {
-    let ratio = env.get('ratio').value;
+    let ratio = env.variables.ratio.value;
     let angle = Math.atan(ratio) * 180 / Math.PI;
     return new ExpressionReal(angle);
   }
@@ -1742,8 +1727,8 @@ export class ExpressionArcTangent extends ExpressionFunction {
 
 export class ExpressionArcTangent2 extends ExpressionFunction {
   evaluate(env, callExpression) {
-    let a = env.get('a').value;
-    let b = env.get('b').value;
+    let a = env.variables.a.value;
+    let b = env.variables.b.value;
     let angle = Math.atan2(a, b) * 180 / Math.PI;
     return new ExpressionReal(angle);
   }
@@ -1753,7 +1738,7 @@ export class ExpressionArcTangent2 extends ExpressionFunction {
 
 export class ExpressionSquareRoot extends ExpressionFunction {
   evaluate(env, callExpression) {
-    let x = env.get('x').value;
+    let x = env.variables.x.value;
     let root = Math.sqrt(x);
     return new ExpressionReal(root);
   }
@@ -1764,8 +1749,10 @@ export class ExpressionSquareRoot extends ExpressionFunction {
 // The casting function.
 export class ExpressionInt extends ExpressionFunction {
   evaluate(env, callExpression) {
-    let f = env.get('x').value;
+    let f = env.variables.x.value;
+    console.log("f:", f);
     let i = Math.trunc(f);
+    console.log("i:", i);
     return new ExpressionInteger(i);
   }
 }
