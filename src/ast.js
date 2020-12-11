@@ -125,10 +125,19 @@ export class ExpressionData extends Expression {
     super(where, unevaluated);
     this.value = value;
     this.prevalues = prevalues;
+    this.functions = [];
   }
 
   bind(env, id) {
     env.bind(id, this);
+  }
+
+  hasFunction(id) {
+    return this.functions.hasOwnProperty(id);
+  }
+
+  getFunction(id) {
+    return this.functions[id];
   }
 
   get type() {
@@ -386,18 +395,9 @@ export class ExpressionString extends ExpressionData {
 
   constructor(value, where, unevaluated, prevalues) {
     super(value, where, unevaluated, prevalues);
-
     this.functions = {
       length: new FunctionDefinition('length', 'Returns the number of characters in this string.', [], new ExpressionStringLength(this)),
     };
-  }
-
-  hasFunction(id) {
-    return this.functions.hasOwnProperty(id);
-  }
-
-  getFunction(id) {
-    return this.functions[id];
   }
 
   clone() {
@@ -1800,7 +1800,6 @@ export class ExpressionVector extends ExpressionData {
       size: new FunctionDefinition('size', '', [], new ExpressionVectorSize(this)),
       magnitude: new FunctionDefinition('magnitude', '', [], new ExpressionVectorMagnitude(this)),
       toCartesian: new FunctionDefinition('toCartesian', '', [], new ExpressionVectorToCartesian(this)),
-      // add: new FunctionDefinition('add', '', [new FormalParameter('item')], new ExpressionVectorAdd(this)),
       rotateAround: new FunctionDefinition('rotateAround', '', [new FormalParameter('pivot'), new FormalParameter('degrees')], new ExpressionVectorRotateAround(this)),
       rotate: new FunctionDefinition('rotate', '', [new FormalParameter('degrees')], new ExpressionVectorRotate(this)),
       rotate90: new FunctionDefinition('rotate90', '', [], new ExpressionVectorRotate90(this)),
@@ -1809,10 +1808,6 @@ export class ExpressionVector extends ExpressionData {
       ], new ExpressionVectorPush(this)),
       pop: new FunctionDefinition('pop', 'Remove the last element from this vector.', [], new ExpressionVectorPop(this)),
     };
-  }
-
-  hasFunction(id) {
-    return this.functions.hasOwnProperty(id);
   }
 
   assign(index, rhs) {
@@ -1867,10 +1862,6 @@ export class ExpressionVector extends ExpressionData {
 
   forEach(each) {
     this.value.forEach(each);
-  }
-
-  getFunction(id) {
-    return this.functions[id];
   }
 
   set(i, value) {
@@ -2618,7 +2609,10 @@ export class ExpressionRevolve extends ExpressionFunction {
 
     const mesh = new Trimesh(positions, faces);
     mesh.setColors(colors);
+
+    console.log("mesh:", mesh);
     env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
+    return new ExpressionTrimesh(mesh);
   }
 }
 
@@ -2751,6 +2745,27 @@ export class ExpressionPolygon extends ExpressionFunction {
 
 // --------------------------------------------------------------------------- 
 
+export class ExpressionTrimesh extends ExpressionData {
+  static type = 'trimesh';
+  static article = 'a';
+
+  constructor(value, where) {
+    super(value, where);
+    this.functions = {
+      scale: new FunctionDefinition('scale', 'Scales this triangular mesh.', [
+        new FormalParameter('factors', 'TODO'),
+        new FormalParameter('origin', 'TODO'),
+      ], new ExpressionTrimeshScale(this)),
+    };
+  }
+
+  toPretty() {
+    return null;
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
 export class ExpressionPath extends ExpressionData {
   static type = 'path';
   static article = 'a';
@@ -2868,6 +2883,25 @@ export class ExpressionMesh extends ExpressionFunction {
 
     const mesh = new Trimesh(positions, faces);
     env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
+  }
+}
+
+// --------------------------------------------------------------------------- 
+
+export class ExpressionTrimeshScale extends ExpressionFunction {
+  constructor(instance, unevaluated) {
+    super(undefined, unevaluated);
+    this.instance = instance;
+  }
+
+  evaluate(env) {
+    const factors = env.variables.factors;
+    const origin = env.variables.origin;
+    const factors3 = new Vector3(factors.value[0].value, factors.value[1].value, factors.value[2].value);
+    const origin3 = new Vector3(origin.value[0].value, origin.value[1].value, origin.value[2].value);
+    const scale = Matrix4.scaleAround(factors3, origin3);
+
+    this.instance.value.transform(scale);
   }
 }
 
