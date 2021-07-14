@@ -16,16 +16,16 @@ import {SourceLocation} from './token.js';
 import {interpret} from './interpreter.js';
 import {Messager} from './messager.js';
 import Interpreter from './interpreter.worker.js';
-import {VertexAttributes} from './twodeejs/vertex_attributes.js';
-import {ShaderProgram} from './twodeejs/shader.js';
-import {VertexArray} from './twodeejs/vertex_array.js';
+import {VertexAttributes} from './twodeejs/vertex-attributes.js';
+import {ShaderProgram} from './twodeejs/shader-program.js';
+import {VertexArray} from './twodeejs/vertex-array.js';
 import {Matrix4} from './twodeejs/matrix.js';
 import {Trackball} from './twodeejs/trackball.js';
 import {Vector2, Vector3, Vector4} from './twodeejs/vector.js';
 import {Trimesh} from './twodeejs/trimesh.js';
 import {Prefab} from './twodeejs/prefab.js';
 import {Camera} from './twodeejs/camera.js';
-import {MathUtilities} from './twodeejs/mathutilities.js';
+import {MathUtilities} from './twodeejs/math-utilities.js';
 import {Path} from './path.js';
 
 // --------------------------------------------------------------------------- 
@@ -547,7 +547,7 @@ function initialize() {
     // minimum: new Vector3(0, 0, 0),
     // maximum: new Vector3(0, 0, 0),
   // };
-  camera = new Camera(new Vector3(0, 0, 0), new Vector3(0, 0, -1), new Vector3(0, 1, 0));
+  camera = Camera.lookAt(new Vector3(0, 0, 0), new Vector3(0, 0, -1), new Vector3(0, 1, 0));
   centerTransform = Matrix4.identity();
   panslation = new Vector2(0, 0);
 
@@ -1075,7 +1075,7 @@ function initializeNodeProgram() {
     nodeProgram.destroy();
   }
 
-  const vertexSource = `#version 300 es
+  const vertexSource = `
 uniform mat4 eyeToClip;
 uniform mat4 modelToEye;
 
@@ -1086,9 +1086,7 @@ void main() {
 }
   `;
 
-  const fragmentSource = `#version 300 es
-precision mediump float;
-
+  const fragmentSource = `
 out vec4 fragmentColor;
 
 void main() {
@@ -1106,7 +1104,7 @@ function initializeSolidMeshProgram() {
     solidMeshProgram.destroy();
   }
 
-  const vertexSource = `#version 300 es
+  const vertexSource = `
 uniform mat4 eyeToClip;
 uniform mat4 modelToEye;
 
@@ -1128,7 +1126,7 @@ void main() {
 }
   `;
 
-  const fragmentSource = `#version 300 es
+  const fragmentSource = `
 precision mediump float;
 
 const vec3 lightPositionEye = vec3(1.0, 1.0, 1.0);
@@ -1164,7 +1162,7 @@ function initializeWireMeshProgram() {
     wireMeshProgram.destroy();
   }
 
-  const vertexSource = `#version 300 es
+  const vertexSource = `
 uniform mat4 eyeToClip;
 uniform mat4 modelToEye;
 
@@ -1189,7 +1187,7 @@ void main() {
 }
   `;
 
-  const fragmentSource = `#version 300 es
+  const fragmentSource = `
 precision mediump float;
 
 const vec3 lightPositionEye = vec3(1.0, 1.0, 1.0);
@@ -1236,7 +1234,7 @@ function initializePathProgram() {
     pathProgram.destroy();
   }
 
-  const vertexSource = `#version 300 es
+  const vertexSource = `
 uniform mat4 eyeToClip;
 uniform mat4 modelToEye;
 uniform float halfThickness;
@@ -1268,7 +1266,7 @@ void main() {
 }
   `;
 
-  const fragmentSource = `#version 300 es
+  const fragmentSource = `
 precision mediump float;
 
 out vec4 fragmentColor;
@@ -1383,6 +1381,8 @@ function render() {
 function resizeWindow() {
   canvas.width = canvas.clientWidth;
   canvas.height = canvas.clientHeight;
+  console.log("canvas.width:", canvas.width);
+  console.log("canvas.height:", canvas.height);
   trackball.setViewport(canvas.width, canvas.height);
   updateProjection();
   render();
@@ -1414,7 +1414,7 @@ function updateProjection() {
 function mouseDown(e) {
   const bounds = e.target.getBoundingClientRect();
   mouseDownAt = new Vector2(e.clientX, canvas.height - 1 - e.clientY);
-  trackball.start(mouseDownAt.x - bounds.left, mouseDownAt.y);
+  trackball.start(new Vector2(mouseDownAt.x - bounds.left, mouseDownAt.y));
   isMouseDown = true;
 }
 
@@ -1426,7 +1426,7 @@ function mouseMove(e) {
 
     if (e.buttons & (1 << 0)) {
       const bounds = canvas.getBoundingClientRect();
-      trackball.drag(mouseAt.x - bounds.left, mouseAt.y, 3);
+      trackball.drag(new Vector2(mouseAt.x - bounds.left, mouseAt.y), 3);
     } else if (e.buttons & (1 << 2)) {
       panslation = panslation.add(mouseAt.subtract(mouseDownAt).scalarMultiply(0.001));
     }
@@ -1455,7 +1455,6 @@ function mouseWheel(e) {
 // --------------------------------------------------------------------------- 
 
 function reset() {
-  trackball.reset();
 }
 
 // --------------------------------------------------------------------------- 

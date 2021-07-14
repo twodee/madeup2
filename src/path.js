@@ -1,6 +1,6 @@
 import {Camera} from './twodeejs/camera.js';
 import {Vector3} from './twodeejs/vector.js';
-import {MathUtilities} from './twodeejs/mathutilities.js';
+import {MathUtilities} from './twodeejs/math-utilities.js';
 
 // --------------------------------------------------------------------------- 
 

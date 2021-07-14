@@ -20,7 +20,7 @@ import {Matrix4} from './twodeejs/matrix.js';
 import {Trimesh} from './twodeejs/trimesh.js';
 import {Plane} from './twodeejs/plane.js';
 import {Prefab} from './twodeejs/prefab.js';
-import {MathUtilities} from './twodeejs/mathutilities.js';
+import {MathUtilities} from './twodeejs/math-utilities.js';
 
 import {
   Environment,
