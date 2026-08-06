@@ -2508,7 +2508,7 @@ export class ExpressionDowel extends ExpressionFunction {
     }
 
     const mesh = new Trimesh(positions, faces);
-    mesh.setColors(colors);
+    // mesh.setColors(colors);
     env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
   }
 }
@@ -2608,7 +2608,7 @@ export class ExpressionRevolve extends ExpressionFunction {
     }
 
     const mesh = new Trimesh(positions, faces);
-    mesh.setColors(colors);
+    // mesh.setColors(colors);
 
     console.log("mesh:", mesh);
     env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
@@ -2713,7 +2713,7 @@ export class ExpressionExtrude extends ExpressionFunction {
     }
 
     const mesh = new Trimesh(positions, faces);
-    mesh.setColors(colors);
+    // mesh.setColors(colors);
     env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
   }
 }
@@ -2733,7 +2733,7 @@ export class ExpressionPolygon extends ExpressionFunction {
 
     const positions = vertices.map(vertex => vertex.position);
     const mesh = Trimesh.triangulate(positions);
-    mesh.setColors(vertices.map(vertex => vertex.color));
+    // mesh.setColors(vertices.map(vertex => vertex.color));
 
     if (isFlipped) {
       mesh.reverseWinding();
@@ -2856,7 +2856,8 @@ export class ExpressionTable extends ExpressionFunction {
     }
 
     const mesh = new Trimesh(positions, faces);
-    mesh.setColors(colors);
+    console.log("hi");
+    mesh.extraVertexAttributes.colors = colors;
     env.root.addMesh(name instanceof ExpressionUnit ? undefined : name, mesh);
   }
 }

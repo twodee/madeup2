@@ -195,10 +195,10 @@ function postInterpret(pod) {
       mesh.separateFaces();
 
       const vertexAttributes = new VertexAttributes();
-      vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.getFlatPositions());
-      vertexAttributes.addAttribute('vnormal', mesh.vertexCount, 4, mesh.getFlatNormals());
-      vertexAttributes.addAttribute('vcolor', mesh.vertexCount, 4, mesh.getFlatColors());
-      vertexAttributes.addIndices(mesh.getFlatFaces());
+      vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.flatPositions());
+      vertexAttributes.addAttribute('vnormal', mesh.vertexCount, 4, mesh.flatNormals());
+      // vertexAttributes.addAttribute('vcolor', mesh.vertexCount, 4, mesh.flatColors());
+      vertexAttributes.addIndices(mesh.flatFaces());
 
       if (isWireframe) {
         const barycentricCoordinates = new Array(mesh.vertexCount * 3);
@@ -933,10 +933,10 @@ function initializeCursor() {
   mesh.separateFaces();
 
   const vertexAttributes = new VertexAttributes();
-  vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.getFlatPositions());
-  vertexAttributes.addAttribute('vnormal', mesh.vertexCount, 4, mesh.getFlatNormals());
-  vertexAttributes.addAttribute('vcolor', mesh.vertexCount, 4, mesh.getFlatColors());
-  vertexAttributes.addIndices(mesh.getFlatFaces());
+  vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.flatPositions());
+  vertexAttributes.addAttribute('vnormal', mesh.vertexCount, 4, mesh.flatNormals());
+  // vertexAttributes.addAttribute('vcolor', mesh.vertexCount, 4, mesh.flatColors());
+  vertexAttributes.addIndices(mesh.flatFaces());
 
   const vertexArray = new VertexArray(solidMeshProgram, vertexAttributes);
 
@@ -953,8 +953,8 @@ function initializePathifyNodeObject() {
   const mesh = Prefab.sphere(0.03, new Vector3(0, 0, 0), 20, 10); 
 
   const vertexAttributes = new VertexAttributes();
-  vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.getFlatPositions());
-  vertexAttributes.addIndices(mesh.getFlatFaces());
+  vertexAttributes.addAttribute('vposition', mesh.vertexCount, 4, mesh.flatPositions());
+  vertexAttributes.addIndices(mesh.flatFaces());
 
   const vertexArray = new VertexArray(nodeProgram, vertexAttributes);
 
@@ -1110,7 +1110,7 @@ uniform mat4 modelToEye;
 
 in vec3 vposition;
 in vec3 vnormal;
-in vec3 vcolor;
+// in vec3 vcolor;
 
 out vec3 positionEye;
 out vec3 normalEye;
@@ -1122,7 +1122,7 @@ void main() {
 
   normalEye = normalize((modelToEye * vec4(vnormal, 0.0)).xyz);
   positionEye = positionEye4.xyz;
-  albedo = vcolor;
+  albedo = vec3(1.0, 0.5, 0.0);
 }
   `;
 
@@ -1168,7 +1168,7 @@ uniform mat4 modelToEye;
 
 in vec3 vposition;
 in vec3 vnormal;
-in vec3 vcolor;
+// in vec3 vcolor;
 in vec3 vbarycentric;
 
 out vec3 positionEye;
@@ -1183,7 +1183,7 @@ void main() {
   normalEye = normalize((modelToEye * vec4(vnormal, 0.0)).xyz);
   positionEye = positionEye4.xyz;
   fbarycentric = vbarycentric;
-  albedo = vcolor;
+  albedo = vec3(1.0, 0.5, 0.0);
 }
   `;
 
@@ -1301,12 +1301,7 @@ function render() {
 
   gl.enable(gl.DEPTH_TEST);
 
-  const worldToEye = camera.matrix.multiplyMatrix(
-    Matrix4.translate(panslation.x, panslation.y, 0)
-      .multiplyMatrix(Matrix4.translate(0, 0, -zoom)
-      .multiplyMatrix(trackball.rotation)
-      .multiplyMatrix(centerTransform))
-  );
+  const worldToEye = camera.matrix.multiplyMatrix(Matrix4.translate(panslation.x, panslation.y, 0).multiplyMatrix(Matrix4.translate(0, 0, -zoom).multiplyMatrix(trackball.matrix).multiplyMatrix(centerTransform)));
 
   if (pathObjects.length > 0) {
     // Polyline paths.
